@@ -20,8 +20,8 @@ async fn main() {
     // Create a UDP socket for the middleware
     let middleware_socket = UdpSocket::bind(&middleware_address).await.expect("Failed to bind middleware socket");
 
-    let server_addresses = ["0.0.0.0:54321", "0.0.0.0:54322"];
-    let mut current_server = 0;
+    let server_addresses = ["0.0.0.0:21112", "0.0.0.0:21111"];
+    let mut current_server = 1;
     let mut buffer = [0; 1024];
     let mut ack_buffer = [0; 1024];
 
@@ -32,7 +32,6 @@ async fn main() {
             println!("Yo2");
             let server_address = server_addresses[server_index];
             let server_address: SocketAddr = server_address.parse().expect("Failed to parse server address");
-
             let mut server_socket = UdpSocket::bind("0.0.0.0:0").await.expect("Failed to bind server socket");
             server_socket.connect(&server_address).await.expect("Failed to connect to the server");
             println!("Yo3");
