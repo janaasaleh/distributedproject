@@ -10,6 +10,18 @@ async fn load_balance(current_server: &mut usize) -> usize {
     *current_server
 }
 
+// async fn load_balance(current_server: &mut usize, serversize: &mut [u8; 2]) -> usize {
+//     //select erver with more capacity and less buffer usage
+//     let selected_server = if serversize[0] < serversize[1] {
+//         0
+//     } else {
+//         1
+//     };
+
+//     *current_server = selected_server;
+//     selected_server
+// }
+
 #[tokio::main]
 async fn main() {
     let middleware_address: SocketAddr = "0.0.0.0:12345".parse().expect("Failed to parse middleware address");
@@ -24,15 +36,20 @@ async fn main() {
     let mut current_server = 1;
     let mut buffer = [0; 1024];
     let mut ack_buffer = [0; 1024];
+    // let mut serversize = [0, 0];
 
     let middleware_task = tokio::spawn(async move {
         if let Ok((bytes_received, client_address)) = middleware_socket.recv_from(&mut buffer).await {
             println!("Yo1");
             let server_index = load_balance(&mut current_server).await;
+        
+
             println!("Yo2");
             let server_address = server_addresses[server_index];
             let server_address: SocketAddr = server_address.parse().expect("Failed to parse server address");
             let mut server_socket = UdpSocket::bind("0.0.0.0:0").await.expect("Failed to bind server socket");
+      
+           
             server_socket.connect(&server_address).await.expect("Failed to connect to the server");
             println!("Yo3");
             server_socket.send_to(&buffer, &server_address).await.expect("Failed to send data to server");

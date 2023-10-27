@@ -1,1 +1,1 @@
-G:\AUC\Distributed\ systems\Project\distributedproject\client_one\target\debug\client_one.exe: G:\AUC\Distributed\ systems\Project\distributedproject\client_one\src\main.rs
+/home/janasaleh/Documents/distributedproject/client_one/target/debug/client_one: /home/janasaleh/Documents/distributedproject/client_one/src/main.rs

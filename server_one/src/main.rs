@@ -38,10 +38,23 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
 
     let mut receive_buffer = [0; 1024];
     let mut send_buffer = [0; 1024]; // Separate buffer for sending data
+
+    // Initialize buffer capacities for each server
+    let mut serversize: Vec<u32> = vec![1024, 1024];  
+
     while let Ok((bytes_received, client_address)) = middleware_socket.recv_from(&mut receive_buffer).await {
         println!("Entered Here 1");
+        
+        //server with the highest capacity (minimum buffer usage)
+        let mut selected_server = 0;
+        for (index, &size) in serversize.iter().enumerate() {
+            if size < serversize[selected_server] {
+                selected_server = index;
+            }
+        }
+        
         let server_index = 0;  // You can implement load balancing logic here
-        let server_address = server_addresses[server_index];
+        let server_address = server_addresses[selected_server];
         let server_address: SocketAddr = server_address.parse().expect("Failed to parse server address");
 
         let mut server_socket = UdpSocket::bind("0.0.0.0:0").await.expect("Failed to bind server socket");
@@ -51,6 +64,10 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
         send_buffer[..bytes_received].copy_from_slice(&receive_buffer[..bytes_received]);
 
         server_socket.send_to(&send_buffer[..bytes_received], &server_address).await.expect("Failed to send data to server");
+        
+        // Update server sizes after proc
+        serversize[selected_server] -= bytes_received as u32;
+        
         println!("Entered Here 2");
 
 
@@ -61,8 +78,11 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
         middleware_socket.send_to(&receive_buffer[..ack_bytes_received], client_address).await.expect("Failed to send acknowledgment to client");
         println!("Entered Here 4");
 
-        // Clear the receive buffer for the next request
+        // Clear the receive buffer for the next request 
         receive_buffer = [0; 1024];
+        
+        //restoring the server cap for next request
+        serversize[selected_server] += bytes_received as u32;
     }
 }
 
