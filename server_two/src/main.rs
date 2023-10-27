@@ -39,12 +39,25 @@ async fn server2(server_address: &str, middleware_address: &str) {
 async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>) {
     let middleware_socket = UdpSocket::bind(middleware_address).await.expect("Failed to bind middleware socket");
     println!("Server middleware is listening on {}", middleware_address);
-
+    let mut current_server = 0;
     let mut receive_buffer = [0; 1024];
     let mut send_buffer = [0; 1024]; // Separate buffer for sending data
     while let Ok((bytes_received, client_address)) = middleware_socket.recv_from(&mut receive_buffer).await {
         println!("Entered Here 1");
-        continue;
+        if (current_server==0)
+        {
+            current_server+=1;
+            continue;
+        }
+        else if current_server == 1
+        {
+            current_server+=1;
+        }
+        else if current_server == 2
+        {
+            current_server=0;
+            continue;
+        }
         let server_index = 1;  // You can implement load balancing logic here
         let server_address = server_addresses[server_index];
         let server_address: SocketAddr = server_address.parse().expect("Failed to parse server address");

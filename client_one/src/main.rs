@@ -20,7 +20,7 @@ async fn main() {
     // Create a UDP socket for the middleware
     let middleware_socket = UdpSocket::bind(&middleware_address).await.expect("Failed to bind middleware socket");
 
-    let server_addresses = ["127.0.0.2:21112", "127.0.0.3:21111"];
+    let server_addresses = ["127.0.0.2:21112", "127.0.0.3:21111","127.0.0.4:21113"];
     let mut current_server = 1;
     let mut buffer = [0; 1024];
     let mut ack_buffer = [0; 1024];
@@ -38,7 +38,7 @@ async fn main() {
                 println!("Yo4");
                
                 // Set a timeout for acknowledgment
-                let timeout_duration = Duration::from_secs(10); // Set a 2-second timeout
+                let timeout_duration = Duration::from_secs(1); // Set a 2-second timeout
                 let ack_timeout = tokio::time::timeout(timeout_duration, server_socket.recv_from(&mut ack_buffer)).await;
 
                
@@ -85,3 +85,4 @@ async fn main() {
     // Wait for the middleware task to finish
     middleware_task.await.expect("Middleware task failed");
 }
+
