@@ -51,8 +51,10 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
     let mut send_buffer = [0; 1024]; // Separate buffer for sending data
     while let Ok((bytes_received, client_address)) =
         middleware_socket.recv_from(&mut receive_buffer).await
-    {
+    {   
         println!("Entered Here 1");
+
+        
         if current_server == 0 {
             current_server += 1;
         } else if current_server == 1 {
