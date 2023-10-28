@@ -1,9 +1,7 @@
 use async_std::net::UdpSocket;
-use std::net::UdpSocket as StdUdpSocket;
 use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::time::sleep;
-use std::thread;
 
 async fn load_balance(current_server: &mut usize) -> usize {
     *current_server = 1 - *current_server; // Toggle between 0 and 1
