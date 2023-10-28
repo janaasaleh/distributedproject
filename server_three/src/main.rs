@@ -35,6 +35,10 @@ async fn server3(server_address: &str, _middleware_address: &str) {
 
 async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>) {
     let middleware_socket = UdpSocket::bind(middleware_address).await.expect("Failed to bind middleware socket");
+    let server_to_server_socket = UdpSocket::bind("127.0.0.4:8080")
+    .await
+    .expect("Failed to bind server to server socket");
+
     println!("Server middleware is listening on {}", middleware_address);
 
     let mut receive_buffer = [0; 1024];
@@ -42,6 +46,27 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
     let mut send_buffer = [0; 1024]; // Separate buffer for sending data
     while let Ok((bytes_received, client_address)) = middleware_socket.recv_from(&mut receive_buffer).await {
         println!("Entered Here 1");
+
+        let mut server_to_server_receive_buffer = [0; 4];
+
+        server_to_server_socket
+            .recv_from(&mut server_to_server_receive_buffer)
+            .await
+            .expect("Couldn't recieve index");
+
+        let index = i32::from_be_bytes([
+            server_to_server_receive_buffer[0],
+            server_to_server_receive_buffer[1],
+            server_to_server_receive_buffer[2],
+            server_to_server_receive_buffer[3],
+        ]);
+
+        println!("Index recieved {}", index);
+
+        if index != current_server {
+            current_server = index;
+        }
+
         if current_server==0
         {
             current_server+=1;
@@ -78,6 +103,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
         println!("Entered Here 4");
 
         // Clear the receive buffer for the next request
+        server_to_server_receive_buffer = [0;4];
         receive_buffer = [0; 1024];
     }
 }
