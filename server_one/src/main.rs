@@ -1,7 +1,10 @@
 use async_std::net::UdpSocket;
+use async_std::task;
 use std::net::SocketAddr;
+use std::time::Duration;
+use tokio::time::sleep;
 
-async fn server1(server_address: &str, _middleware_address: &str) {
+async fn server1(server_address: &str, middleware_address: &str, server_addresses: Vec<&str>) {
     let parts: Vec<&str> = server_address.split(':').collect();
     let port = parts[1]
         .parse::<u16>()
@@ -17,12 +20,12 @@ async fn server1(server_address: &str, _middleware_address: &str) {
 
     let mut buffer = [0; 1024];
 
-    while let Ok((_bytes_received, client_address)) = socket.recv_from(&mut buffer).await {
+    while let Ok((bytes_received, client_address)) = socket.recv_from(&mut buffer).await {
         let message = String::from_utf8_lossy(&buffer);
         println!("Server 1 received: {}", message);
 
         let response = match port {
-            54322 => "Server 1 received your message",
+            54321 => "Server 1 received your message",
             _ => "Server 1 received your message",
         };
 
@@ -39,47 +42,40 @@ async fn server1(server_address: &str, _middleware_address: &str) {
         // Clear the buffer for the next request
         buffer = [0; 1024];
     }
+
+    // Simulate a server failure (for example, after some time)
+    //sleep(Duration::from_secs(10)).await;
+
+    // Notify other servers about the failure
+    let server_notify_socket = UdpSocket::bind("127.0.0.2:0")
+        .await
+        .expect("Failed to bind server notify socket");
+
+    let message = "Server 1 is down";
+    for addr in &server_addresses {
+        let server_address: SocketAddr = addr.parse().expect("Failed to parse server address");
+        if server_address != server_address {
+            server_notify_socket
+                .send_to(message.as_bytes(), server_address)
+                .await
+                .expect("Failed to send notification");
+        }
+    }
 }
 
 async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>) {
     let middleware_socket = UdpSocket::bind(middleware_address)
         .await
         .expect("Failed to bind middleware socket");
-
-    let server_to_server_socket = UdpSocket::bind("127.0.0.2:8080")
-        .await
-        .expect("Failed to bind server to server socket");
-
     println!("Server middleware is listening on {}", middleware_address);
-    let mut current_server: i32 = 0;
+    let mut current_server = 0;
     let mut receive_buffer = [0; 1024];
     let mut send_buffer = [0; 1024]; // Separate buffer for sending data
     while let Ok((bytes_received, client_address)) =
         middleware_socket.recv_from(&mut receive_buffer).await
     {
         println!("Entered Here 1");
-
-        server_to_server_socket
-            .connect("127.0.0.3:8080")
-            .await
-            .expect("Failed to connect to the server");
-        server_to_server_socket
-            .connect("127.0.0.4:8080")
-            .await
-            .expect("Failed to connect to the server");
-
-        let index: &[u8] = &current_server.to_be_bytes();
-
-        server_to_server_socket
-            .send_to(index, "127.0.0.3:8080")
-            .await
-            .expect("Failed to send index to server 2");
-        server_to_server_socket
-            .send_to(index, "127.0.0.4:8080")
-            .await
-            .expect("Failed to send index to server 3");
-
-        if current_server == 0 {
+        if (current_server == 0) {
             current_server += 1;
         } else if current_server == 1 {
             current_server += 1;
@@ -96,7 +92,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
             .parse()
             .expect("Failed to parse server address");
 
-        let server_socket = UdpSocket::bind("127.0.0.2:0")
+        let mut server_socket = UdpSocket::bind("127.0.0.2:0")
             .await
             .expect("Failed to bind server socket");
         server_socket
@@ -132,6 +128,20 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
     }
 }
 
+async fn serverStateNotif(server_address: &str, notify_address: &str) {
+    let server_notify_socket = UdpSocket::bind(notify_address)
+        .await
+        .expect("Failed to bind server notify socket");
+
+    let mut receive_buffer = [0; 1024];
+
+    while let Ok((bytes_received, _)) = server_notify_socket.recv_from(&mut receive_buffer).await {
+        let message = String::from_utf8_lossy(&receive_buffer[..bytes_received]);
+        println!("Received notification: {}", message);
+        //implement failure handling here
+        //just logging the message.
+    }
+}
 #[tokio::main]
 async fn main() {
     let middleware_address: SocketAddr = "127.0.0.2:21112"
@@ -141,10 +151,20 @@ async fn main() {
 
     // Define the server addresses and middleware addresses
     let server_addresses = ["127.0.0.2:54321", "127.0.0.3:54322", "127.0.0.4:54323"];
-    let server1_task = server1("127.0.0.2:54321", &middleware_address_str);
+    let server_notify_address = "127.0.0.5:54321"; // A separate address for server notifications
+
+    // Start the server notification task
+    let server_notify_task = serverStateNotif(&server_addresses[0], server_notify_address);
+
+    // Start the server1
+    let server1_task = server1(
+        "127.0.0.2:54321",
+        &middleware_address_str,
+        server_addresses.to_vec(),
+    );
 
     // Start the server middleware
     let server_middleware_task =
         server_middleware(&middleware_address_str, server_addresses.to_vec());
-    let _ = tokio::join!(server1_task, server_middleware_task);
+    let _ = tokio::join!(server1_task, server_notify_task, server_middleware_task);
 }
