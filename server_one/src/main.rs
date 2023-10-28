@@ -1,10 +1,7 @@
 use async_std::net::UdpSocket;
-use async_std::task;
 use std::net::SocketAddr;
-use std::time::Duration;
-use tokio::time::sleep;
 
-async fn server1(server_address: &str, middleware_address: &str, server_addresses: Vec<&str>) {
+async fn server1(server_address: &str, _middleware_address: &str, server_addresses: Vec<&str>) {
     let parts: Vec<&str> = server_address.split(':').collect();
     let port = parts[1]
         .parse::<u16>()
@@ -20,7 +17,7 @@ async fn server1(server_address: &str, middleware_address: &str, server_addresse
 
     let mut buffer = [0; 1024];
 
-    while let Ok((bytes_received, client_address)) = socket.recv_from(&mut buffer).await {
+    while let Ok((_bytes_received, client_address)) = socket.recv_from(&mut buffer).await {
         let message = String::from_utf8_lossy(&buffer);
         println!("Server 1 received: {}", message);
 
@@ -75,7 +72,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
         middleware_socket.recv_from(&mut receive_buffer).await
     {
         println!("Entered Here 1");
-        if (current_server == 0) {
+        if (current_server == 0){
             current_server += 1;
         } else if current_server == 1 {
             current_server += 1;
@@ -128,7 +125,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
     }
 }
 
-async fn serverStateNotif(server_address: &str, notify_address: &str) {
+async fn server_state_notif(_server_address: &str, notify_address: &str) {
     let server_notify_socket = UdpSocket::bind(notify_address)
         .await
         .expect("Failed to bind server notify socket");
@@ -154,7 +151,7 @@ async fn main() {
     let server_notify_address = "127.0.0.5:54321"; // A separate address for server notifications
 
     // Start the server notification task
-    let server_notify_task = serverStateNotif(&server_addresses[0], server_notify_address);
+    let server_notify_task = server_state_notif(&server_addresses[0], server_notify_address);
 
     // Start the server1
     let server1_task = server1(
