@@ -1,0 +1,13 @@
+/home/janasaleh/Documents/distributedproject/middleware/target/debug/deps/log-36401391c8606ab7.rmeta: /home/janasaleh/.cargo/registry/src/github.com-1ecc6299db9ec823/log-0.4.20/src/lib.rs /home/janasaleh/.cargo/registry/src/github.com-1ecc6299db9ec823/log-0.4.20/src/macros.rs /home/janasaleh/.cargo/registry/src/github.com-1ecc6299db9ec823/log-0.4.20/src/serde.rs /home/janasaleh/.cargo/registry/src/github.com-1ecc6299db9ec823/log-0.4.20/src/kv/mod.rs /home/janasaleh/.cargo/registry/src/github.com-1ecc6299db9ec823/log-0.4.20/src/kv/error.rs /home/janasaleh/.cargo/registry/src/github.com-1ecc6299db9ec823/log-0.4.20/src/kv/key.rs /home/janasaleh/.cargo/registry/src/github.com-1ecc6299db9ec823/log-0.4.20/src/kv/source.rs /home/janasaleh/.cargo/registry/src/github.com-1ecc6299db9ec823/log-0.4.20/src/kv/value.rs /home/janasaleh/.cargo/registry/src/github.com-1ecc6299db9ec823/log-0.4.20/src/__private_api.rs
+
+/home/janasaleh/Documents/distributedproject/middleware/target/debug/deps/log-36401391c8606ab7.d: /home/janasaleh/.cargo/registry/src/github.com-1ecc6299db9ec823/log-0.4.20/src/lib.rs /home/janasaleh/.cargo/registry/src/github.com-1ecc6299db9ec823/log-0.4.20/src/macros.rs /home/janasaleh/.cargo/registry/src/github.com-1ecc6299db9ec823/log-0.4.20/src/serde.rs /home/janasaleh/.cargo/registry/src/github.com-1ecc6299db9ec823/log-0.4.20/src/kv/mod.rs /home/janasaleh/.cargo/registry/src/github.com-1ecc6299db9ec823/log-0.4.20/src/kv/error.rs /home/janasaleh/.cargo/registry/src/github.com-1ecc6299db9ec823/log-0.4.20/src/kv/key.rs /home/janasaleh/.cargo/registry/src/github.com-1ecc6299db9ec823/log-0.4.20/src/kv/source.rs /home/janasaleh/.cargo/registry/src/github.com-1ecc6299db9ec823/log-0.4.20/src/kv/value.rs /home/janasaleh/.cargo/registry/src/github.com-1ecc6299db9ec823/log-0.4.20/src/__private_api.rs
+
+/home/janasaleh/.cargo/registry/src/github.com-1ecc6299db9ec823/log-0.4.20/src/lib.rs:
+/home/janasaleh/.cargo/registry/src/github.com-1ecc6299db9ec823/log-0.4.20/src/macros.rs:
+/home/janasaleh/.cargo/registry/src/github.com-1ecc6299db9ec823/log-0.4.20/src/serde.rs:
+/home/janasaleh/.cargo/registry/src/github.com-1ecc6299db9ec823/log-0.4.20/src/kv/mod.rs:
+/home/janasaleh/.cargo/registry/src/github.com-1ecc6299db9ec823/log-0.4.20/src/kv/error.rs:
+/home/janasaleh/.cargo/registry/src/github.com-1ecc6299db9ec823/log-0.4.20/src/kv/key.rs:
+/home/janasaleh/.cargo/registry/src/github.com-1ecc6299db9ec823/log-0.4.20/src/kv/source.rs:
+/home/janasaleh/.cargo/registry/src/github.com-1ecc6299db9ec823/log-0.4.20/src/kv/value.rs:
+/home/janasaleh/.cargo/registry/src/github.com-1ecc6299db9ec823/log-0.4.20/src/__private_api.rs:
