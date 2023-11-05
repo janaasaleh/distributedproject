@@ -1,4 +1,5 @@
 use async_std::net::UdpSocket;
+use std::fs;
 use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -93,11 +94,11 @@ async fn main() {
     });
 
     // Client code here
-    let client_message = "Request from Client 1!";
+    let image_data = fs::read("image1.jpg").expect("Failed to read the image file");
     let middleware_address = "127.0.0.8:12345"; // Replace with the actual middleware address and port
                                                 //sleep(Duration::from_millis(5000)).await;
     client_socket
-        .send_to(client_message.as_bytes(), middleware_address)
+        .send_to(&image_data, middleware_address)
         .await
         .expect("Failed to send request to middleware");
 

@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 
 async fn server1(server_address: &str, _middleware_address: &str) {
     let parts: Vec<&str> = server_address.split(':').collect();
-    let port = parts[1]
+    let _port = parts[1]
         .parse::<u16>()
         .expect("Failed to parse port as u16");
     let server_address: SocketAddr = server_address
@@ -18,18 +18,19 @@ async fn server1(server_address: &str, _middleware_address: &str) {
     let mut buffer = [0; 1024];
 
     while let Ok((_bytes_received, client_address)) = socket.recv_from(&mut buffer).await {
-        let message = String::from_utf8_lossy(&buffer);
-        println!("Server 1 received: {}", message);
+        let _image = image::load_from_memory(&buffer[.._bytes_received]);
+        println!("Server 1 received image");
 
-        let response = match port {
-            54322 => "Server 1 received your message",
-            _ => "Server 1 received your message",
-        };
+        
 
-        println!("Server 1 responding with: {}", response);
+        println!("Server 1 sending image");
         //sleep(Duration::from_millis(7000)).await;
         // Send the response to the client's middleware
-        if let Err(err) = socket.send_to(response.as_bytes(), client_address).await {
+
+        if let Err(err) = socket
+            .send_to(&buffer[.._bytes_received], client_address)
+            .await
+        {
             eprintln!(
                 "Server 1 failed to send acknowledgment to middleware: {}",
                 err
