@@ -7,7 +7,9 @@ use tokio::time::sleep;
 // async fn load_balance(current_server: &mut usize) -> usize {
 //     *current_server = 1 - *current_server; // Toggle between 0 and 1
 //     *current_server
-// }
+// }1024
+
+const BUFFER_SIZE: usize = 102400;
 
 #[tokio::main]
 async fn main() {
@@ -26,8 +28,8 @@ async fn main() {
         .expect("Failed to bind middleware socket");
 
     let server_addresses = ["127.0.0.2:21112", "127.0.0.3:21111", "127.0.0.4:21113"];
-    let mut buffer = [0; 1024];
-    let mut ack_buffer = [0; 1024];
+    let mut buffer = [0; BUFFER_SIZE];
+    let mut ack_buffer = [0; BUFFER_SIZE];
 
     let middleware_task = tokio::spawn(async move {
         if let Ok((_bytes_received, client_address)) =
@@ -88,8 +90,8 @@ async fn main() {
             sleep(Duration::from_millis(10)).await;
 
             // Clear the buffer for the next request
-            buffer = [0; 1024];
-            ack_buffer = [0; 1024];
+            buffer = [0; BUFFER_SIZE];
+            ack_buffer = [0; BUFFER_SIZE];
         }
     });
 
@@ -103,13 +105,19 @@ async fn main() {
         .expect("Failed to send request to middleware");
 
     // Receive response from the server (the first one)
-    let mut client_buffer = [0; 1024];
-    client_socket
+    let mut client_buffer = [0; BUFFER_SIZE];
+    let (_bytes_received, _) = client_socket
         .recv_from(&mut client_buffer)
         .await
         .expect("Failed to receive response from server");
-    let response = String::from_utf8_lossy(&client_buffer);
-    println!("Client received response from server: {}", response);
+
+    if let Err(err) = fs::write("encrypted.jpg", &client_buffer[.._bytes_received]) {
+        eprintln!("Failed to write the received image to file: {}", err);
+    } else {
+        println!("Received image saved to encrypted.jpg");
+    }
+
+    client_buffer = [0; BUFFER_SIZE];
 
     // Wait for the middleware task to finish
     middleware_task.await.expect("Middleware task failed");

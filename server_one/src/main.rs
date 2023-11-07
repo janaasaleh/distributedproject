@@ -1,6 +1,8 @@
 use async_std::net::UdpSocket;
 use std::net::SocketAddr;
 
+const BUFFER_SIZE: usize = 102400;
+
 async fn server1(server_address: &str, _middleware_address: &str) {
     let parts: Vec<&str> = server_address.split(':').collect();
     let _port = parts[1]
@@ -15,13 +17,13 @@ async fn server1(server_address: &str, _middleware_address: &str) {
         .expect("Failed to bind server socket");
     println!("Server 1 socket is listening on {}", server_address);
 
-    let mut buffer = [0; 1024];
+    let mut buffer = [0; BUFFER_SIZE];
 
     while let Ok((_bytes_received, client_address)) = socket.recv_from(&mut buffer).await {
         let _image = image::load_from_memory(&buffer[.._bytes_received]);
         println!("Server 1 received image");
 
-        
+        //encrypt image
 
         println!("Server 1 sending image");
         //sleep(Duration::from_millis(7000)).await;
@@ -38,7 +40,7 @@ async fn server1(server_address: &str, _middleware_address: &str) {
         }
         println!("Middleware address {}", client_address);
         // Clear the buffer for the next request
-        buffer = [0; 1024];
+        buffer = [0; BUFFER_SIZE];
     }
 }
 
@@ -53,8 +55,8 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
 
     println!("Server middleware is listening on {}", middleware_address);
     let mut current_server: i32 = 0;
-    let mut receive_buffer = [0; 1024];
-    let mut send_buffer = [0; 1024]; // Separate buffer for sending data
+    let mut receive_buffer = [0; BUFFER_SIZE];
+    let mut send_buffer = [0; BUFFER_SIZE]; // Separate buffer for sending data
     while let Ok((bytes_received, client_address)) =
         middleware_socket.recv_from(&mut receive_buffer).await
     {
@@ -129,7 +131,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
         println!("Entered Here 4");
 
         // Clear the receive buffer for the next request
-        receive_buffer = [0; 1024];
+        receive_buffer = [0; BUFFER_SIZE];
     }
 }
 
