@@ -1,5 +1,4 @@
 use async_std::net::UdpSocket;
-use std::char::MAX;
 use std::io::Error;
 use std::net::SocketAddr;
 
@@ -24,7 +23,7 @@ async fn send_image(
     Ok(())
 }
 
-async fn server1(server_address: &str, _middleware_address: &str) {
+async fn server1(server_address: &str, _middleware_address: &SocketAddr) {
     let parts: Vec<&str> = server_address.split(':').collect();
     let _port = parts[1]
         .parse::<u16>()
@@ -50,8 +49,14 @@ async fn server1(server_address: &str, _middleware_address: &str) {
             let image_result = image::load_from_memory(&image_chunks);
             if let Ok(mut image) = image_result {
                 if let Err(err) =
-                    send_image(&socket, &image_chunks, &server_address, MAX_PACKET_SIZE).await
+                    send_image(&socket, &image_chunks, _middleware_address, MAX_PACKET_SIZE).await
                 {
+                    eprintln!(
+                        "Server 1 failed to send processed image to middleware: {}",
+                        err
+                    );
+                } else {
+                    println!("Server 1 sent processed image back to middleware");
                 }
             } else {
                 eprintln!("Failed to load received image");
@@ -74,7 +79,7 @@ async fn server1(server_address: &str, _middleware_address: &str) {
     }
 }
 
-async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>) {
+async fn server_middleware(middleware_address: &SocketAddr, server_addresses: Vec<&str>) {
     let middleware_socket = UdpSocket::bind(middleware_address)
         .await
         .expect("Failed to bind middleware socket");
@@ -170,14 +175,12 @@ async fn main() {
     let middleware_address: SocketAddr = "127.0.0.2:21112"
         .parse()
         .expect("Failed to parse middleware address");
-    let middleware_address_str = middleware_address.to_string();
 
     // Define the server addresses and middleware addresses
     let server_addresses = ["127.0.0.2:54321", "127.0.0.3:54322", "127.0.0.4:54323"];
-    let server1_task = server1("127.0.0.2:54321", &middleware_address_str);
+    let server1_task = server1("127.0.0.2:54321", &middleware_address);
 
     // Start the server middleware
-    let server_middleware_task =
-        server_middleware(&middleware_address_str, server_addresses.to_vec());
+    let server_middleware_task = server_middleware(&middleware_address, server_addresses.to_vec());
     let _ = tokio::join!(server1_task, server_middleware_task);
 }
