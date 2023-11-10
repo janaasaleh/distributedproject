@@ -1,7 +1,28 @@
 use async_std::net::UdpSocket;
+use std::char::MAX;
+use std::io::Error;
 use std::net::SocketAddr;
 
-const BUFFER_SIZE: usize = 102400;
+const BUFFER_SIZE: usize = 140000;
+
+const MAX_PACKET_SIZE: usize = 1400;
+
+async fn send_image(
+    socket: &UdpSocket,
+    image_data: &[u8],
+    destination: &SocketAddr,
+    max_packet_size: usize,
+) -> Result<(), Error> {
+    for chunk in image_data.chunks(max_packet_size) {
+        // Send a chunk of the image data
+        socket
+            .send_to(chunk, destination)
+            .await
+            .expect("Failed to send image chunk");
+    }
+
+    Ok(())
+}
 
 async fn server1(server_address: &str, _middleware_address: &str) {
     let parts: Vec<&str> = server_address.split(':').collect();
@@ -19,15 +40,24 @@ async fn server1(server_address: &str, _middleware_address: &str) {
 
     let mut buffer = [0; BUFFER_SIZE];
 
+    let mut image_chunks: Vec<u8> = Vec::new();
+
     while let Ok((_bytes_received, client_address)) = socket.recv_from(&mut buffer).await {
-        let _image = image::load_from_memory(&buffer[.._bytes_received]);
-        println!("Server 1 received image");
+        let chunk = &buffer[.._bytes_received];
+        image_chunks.extend_from_slice(chunk);
 
-        //encrypt image
-
-        println!("Server 1 sending image");
-        //sleep(Duration::from_millis(7000)).await;
-        // Send the response to the client's middleware
+        if chunk.len() < BUFFER_SIZE {
+            let image_result = image::load_from_memory(&image_chunks);
+            if let Ok(mut image) = image_result {
+                if let Err(err) =
+                    send_image(&socket, &image_chunks, &server_address, MAX_PACKET_SIZE).await
+                {
+                }
+            } else {
+                eprintln!("Failed to load received image");
+            }
+            image_chunks.clear();
+        }
 
         if let Err(err) = socket
             .send_to(&buffer[.._bytes_received], client_address)
