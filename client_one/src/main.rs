@@ -11,6 +11,7 @@ async fn middleware_task(mut middleware_socket: UdpSocket) {
     let server_addresses = ["127.0.0.2:21112", "127.0.0.3:21111", "127.0.0.4:21113"];
     let mut buffer = [0; 1024];
     let mut ack_buffer = [0; 1024];
+    //let middleware_address: SocketAddr = "127.0.0.8:12345".parse().expect("Failed to parse middleware address");
 
     loop {
         if let Ok((_bytes_received, client_address)) =
@@ -25,47 +26,27 @@ async fn middleware_task(mut middleware_socket: UdpSocket) {
                 let server_address: SocketAddr = server_address
                     .parse()
                     .expect("Failed to parse server address");
-                server_socket
-                    .connect(&server_address)
-                    .await
-                    .expect("Failed to connect to the server");
+                //server_socket
+                //    .connect(&server_address)
+                //    .await
+                //    .expect("Failed to connect to the server");
                 println!("Yo3");
                 server_socket
                     .send_to(&buffer, &server_address)
                     .await
                     .expect("Failed to send data to server");
                 println!("Yo4");
-
-                // Set a timeout for acknowledgment
-                let timeout_duration = Duration::from_secs(1); // Set a 2-second timeout
-                let ack_timeout = tokio::time::timeout(
-                    timeout_duration,
-                    server_socket.recv_from(&mut ack_buffer),
-                )
-                .await;
-
-                if let Ok(ack_result) = ack_timeout {
-                    match ack_result {
-                        Ok((_ack_bytes_received, _)) => {
-                            println!("Yo5"); // Acknowledgment received
-                        }
-                        Err(_) => {
-                            // Timeout occurred, but this will not block for the full 2 seconds
-                            println!(
-                                "Timeout: No acknowledgment received from server {}",
-                                server_address
-                            );
-                        }
-                    }
-                } else {
-                    continue;
-                }
             }
+            println!("Yo5");
+            let (ack_bytes_received, server_address) = server_socket
+            .recv_from(&mut ack_buffer)
+            .await
+            .expect("Failed to receive acknowledgment from server");
             middleware_socket
                 .send_to(&ack_buffer, client_address)
                 .await
                 .expect("Failed to send acknowledgment to client");
-            println!("Yo6");
+            //println!("Yo6");
 
             // Sleep to give time for the server to send the acknowledgment
             sleep(Duration::from_millis(10)).await;
@@ -103,11 +84,11 @@ async fn main() {
     let dos_address= "127.0.0.255:12345";
     let middleware_address: SocketAddr = "127.0.0.8:12345".parse().expect("Failed to parse middleware address");
     let client_socket = UdpSocket::bind("127.0.0.8:0").await.expect("Failed to bind client socket");
-    let client_socket_register = UdpSocket::bind("127.0.0.8:8090").await.expect("Failed to bind client socket");
-    let client_socket_query = UdpSocket::bind("127.0.0.8:8091").await.expect("Failed to bind client socket");
-    register_user(client_socket_register,dos_address, "Client1","Client").await;
-    println!("Finished Registry");
-    query_online_users(client_socket_query,dos_address).await;
+    //let client_socket_register = UdpSocket::bind("127.0.0.8:8090").await.expect("Failed to bind client socket");
+    //let client_socket_query = UdpSocket::bind("127.0.0.8:8091").await.expect("Failed to bind client socket");
+    //register_user(client_socket_register,dos_address, "Client1","Client").await;
+    //println!("Finished Registry");
+    //query_online_users(client_socket_query,dos_address).await;
     let middleware_socket = UdpSocket::bind(&middleware_address).await.expect("Failed to bind middleware socket");
 
     tokio::spawn(middleware_task(middleware_socket));
@@ -126,13 +107,13 @@ async fn main() {
         signal.recv().await;
         println!("Received termination signal");
 
-        let unregister_message = "UNREGISTER";
-        let dos_socket = UdpSocket::bind("127.0.0.8:9000").await.expect("Failed to bind socket");
-        dos_socket
-            .send_to(unregister_message.as_bytes(), dos_address_clone)
-            .await
-            .expect("Failed to send unregister message");
-
+        //let unregister_message = "UNREGISTER";
+        //let dos_socket = UdpSocket::bind("127.0.0.8:9000").await.expect("Failed to bind socket");
+        //dos_socket
+        //    .send_to(unregister_message.as_bytes(), dos_address_clone)
+        //    .await
+        //    .expect("Failed to send unregister message");
+//
         // Notify other tasks waiting for the signal
         //let _ = tx.send(());
         *termination_clone.lock().unwrap() = 1;
@@ -169,12 +150,12 @@ async fn main() {
         }
         if input.trim() == "Q"
         {
-            let unregister_message = "UNREGISTER";
-            let dos_socket = UdpSocket::bind("127.0.0.8:9001").await.expect("Failed to bind socket");
-            dos_socket
-            .send_to(unregister_message.as_bytes(), dos_address_clone)
-            .await
-            .expect("Failed to send unregister message");
+           //let unregister_message = "UNREGISTER";
+           //let dos_socket = UdpSocket::bind("127.0.0.8:9001").await.expect("Failed to bind socket");
+           //dos_socket
+           //.send_to(unregister_message.as_bytes(), dos_address_clone)
+           //.await
+           //.expect("Failed to send unregister message");
             return;
 
         }
