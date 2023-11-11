@@ -1,10 +1,59 @@
 use async_std::net::UdpSocket;
+use std::fs;
+use std::io::Error;
 use std::net::SocketAddr;
+use std::sync::{Arc, Mutex};
+use std::thread;
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::broadcast;
-use std::thread;
-use std::sync::{Arc, Mutex};
 use tokio::time::Duration;
+
+const BUFFER_SIZE: usize = 140000;
+
+const MAX_PACKET_SIZE: usize = 1400;
+
+async fn send_image(
+    socket: &UdpSocket,
+    image_data: &[u8],
+    destination: &SocketAddr,
+    max_packet_size: usize,
+) -> Result<(), Error> {
+    for chunk in image_data.chunks(max_packet_size) {
+        // Send a chunk of the image data
+        socket
+            .send_to(chunk, destination)
+            .await
+            .expect("Failed to send image chunk");
+    }
+
+    Ok(())
+}
+
+async fn receive_image(
+    client_socket: &UdpSocket,
+    output_path: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut image_data: Vec<u8> = Vec::new();
+    let mut buffer = [0; BUFFER_SIZE];
+
+    loop {
+        match client_socket.recv_from(&mut buffer).await {
+            Ok((bytes_received, _)) => {
+                // Append the received data to the image_data vector
+                image_data.extend_from_slice(&buffer[..bytes_received]);
+            }
+            Err(_) => {
+                // No more data to receive, exit the loop
+                break;
+            }
+        }
+    }
+
+    // Write the reconstructed image data to a file
+    fs::write(output_path, &image_data)?;
+
+    Ok(())
+}
 
 async fn server1(server_address: &str, _middleware_address: &str) {
     let parts: Vec<&str> = server_address.split(':').collect();
@@ -20,29 +69,18 @@ async fn server1(server_address: &str, _middleware_address: &str) {
         .expect("Failed to bind server socket");
     println!("Server 1 socket is listening on {}", server_address);
 
-    let mut buffer = [0; 1024];
+    let mut buffer = [0; BUFFER_SIZE];
 
     while let Ok((_bytes_received, client_address)) = socket.recv_from(&mut buffer).await {
-        let message = String::from_utf8_lossy(&buffer);
-        println!("Server 1 received: {}", message);
-
-        let response = match port {
-            54322 => "Server 1 received your message",
-            _ => "Server 1 received your message",
-        };
-
-        println!("Server 1 responding with: {}", response);
         //sleep(Duration::from_millis(7000)).await;
         // Send the response to the client's middleware
-        if let Err(err) = socket.send_to(response.as_bytes(), client_address).await {
-            eprintln!(
-                "Server 1 failed to send acknowledgment to middleware: {}",
-                err
-            );
-        }
-        println!("Middleware address {}", client_address);
-        // Clear the buffer for the next request
-        buffer = [0; 1024];
+
+        socket
+            .send_to(&buffer[.._bytes_received], _middleware_address)
+            .await
+            .expect("coulnt send to middleware");
+
+        buffer = [0; BUFFER_SIZE];
     }
 }
 
@@ -57,8 +95,8 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
 
     println!("Server middleware is listening on {}", middleware_address);
     let mut current_server: i32 = 0;
-    let mut receive_buffer = [0; 1024];
-    let mut send_buffer = [0; 1024]; // Separate buffer for sending data
+    let mut receive_buffer = [0; BUFFER_SIZE];
+    let mut send_buffer = [0; BUFFER_SIZE]; // Separate buffer for sending data
     while let Ok((bytes_received, client_address)) =
         middleware_socket.recv_from(&mut receive_buffer).await
     {
@@ -133,26 +171,43 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
         println!("Entered Here 4");
 
         // Clear the receive buffer for the next request
-        receive_buffer = [0; 1024];
+        receive_buffer = [0; BUFFER_SIZE];
     }
 }
 
-async fn register_user(client_socket: UdpSocket, dos_address: &str, username: &str,usertype: &str) {
-    let registration_message = format!("REGISTER:{}:{}", username,usertype);
-    client_socket.send_to(registration_message.as_bytes(), dos_address).await.expect("Failed to send registration request");
+async fn register_user(
+    client_socket: UdpSocket,
+    dos_address: &str,
+    username: &str,
+    usertype: &str,
+) {
+    let registration_message = format!("REGISTER:{}:{}", username, usertype);
+    client_socket
+        .send_to(registration_message.as_bytes(), dos_address)
+        .await
+        .expect("Failed to send registration request");
 
     let mut response_buffer = [0; 1024];
-    let (bytes_received, _dos_address) = client_socket.recv_from(&mut response_buffer).await.expect("Failed to receive response");
+    let (bytes_received, _dos_address) = client_socket
+        .recv_from(&mut response_buffer)
+        .await
+        .expect("Failed to receive response");
     let response = String::from_utf8_lossy(&response_buffer[..bytes_received]);
     println!("Registration response: {}", response);
 }
 
 async fn query_online_users(client_socket: UdpSocket, middleware_address: &str) {
     // Send a query message to request the list of online users
-    client_socket.send_to("QUERY".as_bytes(), middleware_address).await.expect("Failed to send query request");
+    client_socket
+        .send_to("QUERY".as_bytes(), middleware_address)
+        .await
+        .expect("Failed to send query request");
 
     let mut response_buffer = [0; 1024];
-    let (bytes_received, _middleware_address) = client_socket.recv_from(&mut response_buffer).await.expect("Failed to receive response");
+    let (bytes_received, _middleware_address) = client_socket
+        .recv_from(&mut response_buffer)
+        .await
+        .expect("Failed to receive response");
     let response = String::from_utf8_lossy(&response_buffer[..bytes_received]);
     println!("Online users: {}", response);
 }
@@ -164,25 +219,30 @@ async fn main() {
         .expect("Failed to parse middleware address");
     let middleware_address_str = middleware_address.to_string();
 
-    let dos_address= "127.0.0.255:12345";
-    let server_socket_register = UdpSocket::bind("127.0.0.2:8090").await.expect("Failed to bind client socket");
-    let server_socket_query = UdpSocket::bind("127.0.0.2:8091").await.expect("Failed to bind client socket");
-    register_user(server_socket_register,dos_address, "Server1","Server").await;
+    let dos_address = "127.0.0.255:12345";
+    let server_socket_register = UdpSocket::bind("127.0.0.2:8090")
+        .await
+        .expect("Failed to bind client socket");
+    let server_socket_query = UdpSocket::bind("127.0.0.2:8091")
+        .await
+        .expect("Failed to bind client socket");
+    register_user(server_socket_register, dos_address, "Server1", "Server").await;
     println!("Finished Registry");
-    query_online_users(server_socket_query,dos_address).await;
+    query_online_users(server_socket_query, dos_address).await;
 
     // Define the server addresses and middleware addresses
     let server_addresses = ["127.0.0.2:54321", "127.0.0.3:54322", "127.0.0.4:54323"];
     let server1_task = server1("127.0.0.2:54321", &middleware_address_str);
 
     // Start the server middleware
-    let server_middleware_task = server_middleware(&middleware_address_str, server_addresses.to_vec());
+    let server_middleware_task =
+        server_middleware(&middleware_address_str, server_addresses.to_vec());
 
     let dos_address_clone = dos_address.to_string();
 
     // Spawn a task to listen for the termination signal (Ctrl+C)
-    let mut signal = signal(SignalKind::interrupt()).expect("Failed to register Ctrl+C signal handler");
-
+    let mut signal =
+        signal(SignalKind::interrupt()).expect("Failed to register Ctrl+C signal handler");
 
     // Spawn a task to listen for the termination signal (Ctrl+C)
     tokio::spawn(async move {
@@ -191,7 +251,9 @@ async fn main() {
 
         // Send an "UNREGISTER" message
         let unregister_message = "UNREGISTER";
-        let dos_socket = UdpSocket::bind("127.0.0.2:9001").await.expect("Failed to bind socket");
+        let dos_socket = UdpSocket::bind("127.0.0.2:9001")
+            .await
+            .expect("Failed to bind socket");
         dos_socket
             .send_to(unregister_message.as_bytes(), dos_address_clone)
             .await
@@ -205,9 +267,4 @@ async fn main() {
     });
 
     let _ = tokio::join!(server1_task, server_middleware_task);
-   
-
-
 }
-
-
