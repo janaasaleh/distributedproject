@@ -1,6 +1,5 @@
 use async_std::net::UdpSocket;
 use std::fs;
-use std::io::Error;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -9,50 +8,23 @@ use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::broadcast;
 use tokio::time::sleep;
 
-const BUFFER_SIZE: usize = 140000;
-const MAX_PACKET_SIZE: usize = 1400;
+const BUFFER_SIZE: usize = 102400;
+const MAX_PACKET_SIZE: usize = 1024;
 
-async fn send_image(
-    client_socket: &UdpSocket,
-    image_data: &[u8],
-    destination: &SocketAddr,
-    max_packet_size: usize,
-) -> Result<(), Error> {
-    for chunk in image_data.chunks(MAX_PACKET_SIZE) {
-        // Send a chunk of the image data
-        client_socket
-            .send_to(chunk, destination)
-            .await
-            .expect("Failed to send image chunk");
-    }
+fn shift_left(array: &mut [u8; BUFFER_SIZE], positions: usize) {
+    let len = array.len();
 
-    Ok(())
-}
-
-async fn receive_image(
-    client_socket: &UdpSocket,
-    output_path: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let mut image_data: Vec<u8> = Vec::new();
-    let mut buffer = [0; BUFFER_SIZE];
-
-    loop {
-        match client_socket.recv_from(&mut buffer).await {
-            Ok((bytes_received, _)) => {
-                // Append the received data to the image_data vector
-                image_data.extend_from_slice(&buffer[..bytes_received]);
-            }
-            Err(_) => {
-                // No more data to receive, exit the loop
-                break;
-            }
+    // Ensure positions is within array bounds
+    if positions < len {
+        // Copy elements from position `positions` to the beginning of the array
+        for i in 0..len - positions {
+            array[i] = array[i + positions];
+        }
+        // Set the remaining positions to default values
+        for i in len - positions..len {
+            array[i] = Default::default();
         }
     }
-
-    // Write the reconstructed image data to a file
-    fs::write(output_path, &image_data)?;
-
-    Ok(())
 }
 
 async fn middleware_task(mut middleware_socket: UdpSocket) {
@@ -80,9 +52,10 @@ async fn middleware_task(mut middleware_socket: UdpSocket) {
                 //    .expect("Failed to connect to the server");
                 println!("Yo3");
                 server_socket
-                    .send_to(&buffer, &server_address)
+                    .send_to(&buffer[0..MAX_PACKET_SIZE], &server_address)
                     .await
                     .expect("Failed to send data to server");
+                shift_left(&mut buffer, MAX_PACKET_SIZE);
                 println!("Yo4");
             }
             println!("Yo5");
@@ -203,26 +176,14 @@ async fn main() {
             .read_line(&mut input)
             .expect("Failed to read line");
         if input.trim() == "" {
-            let image_data = fs::read("image1.jpg").expect("Failed to read the image file");
+            let image_data = fs::read("image1.png").expect("Failed to read the image file");
             let middleware_address = "127.0.0.8:12345"; // Replace with the actual middleware address and port
                                                         //sleep(Duration::from_millis(5000)).await;
-            if let Err(err) = send_image(
-                &client_socket,
-                &image_data,
-                &middleware_address.parse().expect("ay haga"),
-                MAX_PACKET_SIZE,
-            )
-            .await
-            {
-                eprintln!("Failed to send the image: {}", err);
-            } else {
-                println!("Image sent successfully to middleware");
-            };
-
-            if let Err(err) = receive_image(&client_socket, "encrypted.jpg").await {
-                eprintln!("Failed to receive and save the image: {}", err)
-            } else {
-                println!("Received image saved to 'encrypted.jpg'");
+            for piece in image_data.chunks(MAX_PACKET_SIZE) {
+                client_socket
+                    .send_to(piece, middleware_address)
+                    .await
+                    .expect("Failed to send piece to middleware");
             }
         }
         if input.trim() == "Q" {

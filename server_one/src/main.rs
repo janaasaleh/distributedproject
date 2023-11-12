@@ -8,54 +8,27 @@ use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::broadcast;
 use tokio::time::Duration;
 
-const BUFFER_SIZE: usize = 140000;
+const BUFFER_SIZE: usize = 102400;
+const MAX_PACKET_SIZE: usize = 1024;
 
-const MAX_PACKET_SIZE: usize = 1400;
+fn shift_left(array: &mut [u8; BUFFER_SIZE], positions: usize) {
+    let len = array.len();
 
-async fn send_image(
-    socket: &UdpSocket,
-    image_data: &[u8],
-    destination: &SocketAddr,
-    max_packet_size: usize,
-) -> Result<(), Error> {
-    for chunk in image_data.chunks(max_packet_size) {
-        // Send a chunk of the image data
-        socket
-            .send_to(chunk, destination)
-            .await
-            .expect("Failed to send image chunk");
-    }
-
-    Ok(())
-}
-
-async fn receive_image(
-    client_socket: &UdpSocket,
-    output_path: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let mut image_data: Vec<u8> = Vec::new();
-    let mut buffer = [0; BUFFER_SIZE];
-
-    loop {
-        match client_socket.recv_from(&mut buffer).await {
-            Ok((bytes_received, _)) => {
-                // Append the received data to the image_data vector
-                image_data.extend_from_slice(&buffer[..bytes_received]);
-            }
-            Err(_) => {
-                // No more data to receive, exit the loop
-                break;
-            }
+    // Ensure positions is within array bounds
+    if positions < len {
+        // Copy elements from position `positions` to the beginning of the array
+        for i in 0..len - positions {
+            array[i] = array[i + positions];
+        }
+        // Set the remaining positions to default values
+        for i in len - positions..len {
+            array[i] = Default::default();
         }
     }
-
-    // Write the reconstructed image data to a file
-    fs::write(output_path, &image_data)?;
-
-    Ok(())
 }
 
 async fn server1(server_address: &str, _middleware_address: &str) {
+    let mut image_data: Vec<u8> = Vec::new();
     let parts: Vec<&str> = server_address.split(':').collect();
     let port = parts[1]
         .parse::<u16>()
@@ -75,10 +48,9 @@ async fn server1(server_address: &str, _middleware_address: &str) {
         //sleep(Duration::from_millis(7000)).await;
         // Send the response to the client's middleware
 
-        socket
-            .send_to(&buffer[.._bytes_received], _middleware_address)
-            .await
-            .expect("coulnt send to middleware");
+        image_data.extend_from_slice(&buffer[.._bytes_received]);
+
+        let _ = fs::write("image.png", &image_data);
 
         buffer = [0; BUFFER_SIZE];
     }
@@ -151,9 +123,11 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
         send_buffer[..bytes_received].copy_from_slice(&receive_buffer[..bytes_received]);
 
         server_socket
-            .send_to(&send_buffer[..bytes_received], &server_address)
+            .send_to(&send_buffer[0..MAX_PACKET_SIZE], &server_address)
             .await
             .expect("Failed to send data to server");
+        shift_left(&mut send_buffer, MAX_PACKET_SIZE);
+
         println!("Entered Here 2");
 
         let (ack_bytes_received, server_caddress) = server_socket
