@@ -49,11 +49,10 @@ async fn server1(server_address: &str, _middleware_address: &str) {
         // Send the response to the client's middleware
 
         image_data.extend_from_slice(&buffer[.._bytes_received]);
-
-        let _ = fs::write("image.png", &image_data);
-
-        buffer = [0; BUFFER_SIZE];
     }
+
+    let _ = fs::write("image.png", &image_data);
+    buffer = [0; BUFFER_SIZE];
 }
 
 async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>) {
