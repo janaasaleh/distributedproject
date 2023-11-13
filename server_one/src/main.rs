@@ -8,7 +8,7 @@ use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::broadcast;
 use tokio::time::Duration;
 
-const BUFFER_SIZE: usize = 102400;
+const BUFFER_SIZE: usize = 10240;
 const MAX_PACKET_SIZE: usize = 1024;
 
 fn shift_left(array: &mut [u8; BUFFER_SIZE], positions: usize) {
@@ -73,6 +73,8 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
     {
         println!("Entered Here 1");
 
+        println!("{:?}", receive_buffer);
+
         server_to_server_socket
             .connect("127.0.0.3:8080")
             .await
@@ -94,13 +96,11 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
             .expect("Failed to send index to server 3");
 
         if current_server == 0 {
-            current_server += 1;
+            current_server =0;
         } else if current_server == 1 {
-            current_server += 1;
-            continue;
+            current_server = 0;
         } else if current_server == 2 {
             current_server = 0;
-            continue;
         }
 
         //continue;
