@@ -41,15 +41,13 @@ async fn middleware_task(middleware_socket: UdpSocket) {
     // let server_addresses = ["127.0.0.2:21112", "127.0.0.3:21111", "127.0.0.4:21113"];
     let server_addresses = ["127.0.0.2:21112"];
     let mut buffer = [0; BUFFER_SIZE];
-    // let mut ack_buffer = [0; BUFFER_SIZE];
+    let mut ack_buffer = [0; BUFFER_SIZE];
     //let middleware_address: SocketAddr = "127.0.0.8:12345".parse().expect("Failed to parse middleware address");
 
     loop {
-        if let Ok((_bytes_received, client_address)) =
-            middleware_socket.recv_from(&mut buffer).await
+        if let Ok((bytes_received, client_address)) = middleware_socket.recv_from(&mut buffer).await
         {
-            println!("Yo1");
-            println!("Yo2");
+            println!("Middleware Received packet");
 
             let server_socket = UdpSocket::bind("127.0.0.8:0")
                 .await
@@ -62,31 +60,29 @@ async fn middleware_task(middleware_socket: UdpSocket) {
                     .connect(&server_address)
                     .await
                     .expect("Failed to connect to the server");
-                println!("Yo3");
                 server_socket
-                    .send_to(&buffer[0.._bytes_received], &server_address)
+                    .send_to(&buffer[0..bytes_received], &server_address)
                     .await
                     .expect("Failed to send data to server");
-                shift_left(&mut buffer, _bytes_received);
-                println!("Yo4");
+                shift_left(&mut buffer, bytes_received);
             }
-            // println!("Yo5");
-            // let (_ack_bytes_received, _server_address) = server_socket
-            //     .recv_from(&mut ack_buffer)
-            //     .await
-            //     .expect("Failed to receive acknowledgment from server");
-            // middleware_socket
-            //     .send_to(&ack_buffer, client_address)
-            //     .await
-            //     .expect("Failed to send acknowledgment to client");
-            // println!("Yo6");
+            let (_ack_bytes_received, _server_address) = server_socket
+                .recv_from(&mut ack_buffer)
+                .await
+                .expect("Failed to receive acknowledgment from server");
+            middleware_socket
+                .send_to(&ack_buffer, client_address)
+                .await
+                .expect("Failed to send acknowledgment to client");
+
+            println!("Middleware sent packet to server");
 
             // Sleep to give time for the server to send the acknowledgment
             sleep(Duration::from_millis(10)).await;
 
             // Clear the buffer for the next request
             buffer = [0; BUFFER_SIZE];
-            // ack_buffer = [0; BUFFER_SIZE];
+            ack_buffer = [0; BUFFER_SIZE];
         }
     }
 }
@@ -170,7 +166,6 @@ async fn main() {
         // Notify other tasks waiting for the signal
         //let _ = tx.send(());
         *termination_clone.lock().unwrap() = 1;
-        tokio::time::sleep(Duration::from_secs(2)).await;
 
         // Exit the application
         std::process::exit(0);
@@ -209,6 +204,12 @@ async fn main() {
                     .send_to(&serialized.as_bytes(), middleware_address)
                     .await
                     .expect("Failed to send piece to middleware");
+
+                let mut ack_buffer = [0; BUFFER_SIZE];
+                client_socket
+                    .recv_from(&mut ack_buffer)
+                    .await
+                    .expect("Failed to receive acknowledgment");
             }
         }
         if input.trim() == "Q" {
