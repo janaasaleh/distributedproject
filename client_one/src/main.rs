@@ -10,7 +10,6 @@ mod big_array;
 use big_array::BigArray;
 
 const BUFFER_SIZE: usize = 10240;
-const MAX_PACKET_SIZE: usize = 1024;
 const MAX_CHUNCK: usize = 256;
 
 type PacketArray = [u8; MAX_CHUNCK];
@@ -51,43 +50,35 @@ async fn middleware_task(middleware_socket: UdpSocket) {
             println!("Yo1");
             println!("Yo2");
 
-            let packet_string = String::from_utf8_lossy(&buffer[0..MAX_PACKET_SIZE - 1]);
-            println!("middleware {}", packet_string);
-            let deserialized: Chunk = serde_json::from_str(&packet_string).unwrap();
-
-            shift_left(&mut buffer, MAX_PACKET_SIZE);
-
-            println!("{:?}", deserialized);
-
-            // let server_socket = UdpSocket::bind("127.0.0.8:0")
-            //     .await
-            //     .expect("Failed to bind server socket");
-            // for server_address in &server_addresses {
-            //     let server_address: SocketAddr = server_address
-            //         .parse()
-            //         .expect("Failed to parse server address");
-            //     //server_socket
-            //     //    .connect(&server_address)
-            //     //    .await
-            //     //    .expect("Failed to connect to the server");
-            //     println!("Yo3");
-            //     server_socket
-            //         .send_to(&buffer[0..MAX_PACKET_SIZE], &server_address)
-            //         .await
-            //         .expect("Failed to send data to server");
-            //     shift_left(&mut buffer, MAX_PACKET_SIZE);
-            //     println!("Yo4");
-            // }
+            let server_socket = UdpSocket::bind("127.0.0.8:0")
+                .await
+                .expect("Failed to bind server socket");
+            for server_address in &server_addresses {
+                let server_address: SocketAddr = server_address
+                    .parse()
+                    .expect("Failed to parse server address");
+                server_socket
+                    .connect(&server_address)
+                    .await
+                    .expect("Failed to connect to the server");
+                println!("Yo3");
+                server_socket
+                    .send_to(&buffer[0.._bytes_received], &server_address)
+                    .await
+                    .expect("Failed to send data to server");
+                shift_left(&mut buffer, _bytes_received);
+                println!("Yo4");
+            }
             println!("Yo5");
-            // let (_ack_bytes_received, _server_address) = server_socket
-            //     .recv_from(&mut ack_buffer)
-            //     .await
-            //     .expect("Failed to receive acknowledgment from server");
-            // middleware_socket
-            //     .send_to(&ack_buffer, client_address)
-            //     .await
-            //     .expect("Failed to send acknowledgment to client");
-            //println!("Yo6");
+            let (_ack_bytes_received, _server_address) = server_socket
+                .recv_from(&mut ack_buffer)
+                .await
+                .expect("Failed to receive acknowledgment from server");
+            middleware_socket
+                .send_to(&ack_buffer, client_address)
+                .await
+                .expect("Failed to send acknowledgment to client");
+            println!("Yo6");
 
             // Sleep to give time for the server to send the acknowledgment
             sleep(Duration::from_millis(10)).await;

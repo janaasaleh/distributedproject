@@ -1,15 +1,24 @@
 use async_std::net::UdpSocket;
+use serde::{Deserialize, Serialize};
 use std::fs;
-use std::io::Error;
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex};
-use std::thread;
 use tokio::signal::unix::{signal, SignalKind};
-use tokio::sync::broadcast;
 use tokio::time::Duration;
 
+mod big_array;
+use big_array::BigArray;
+
 const BUFFER_SIZE: usize = 10240;
-const MAX_PACKET_SIZE: usize = 1024;
+const MAX_CHUNCK: usize = 256;
+
+type PacketArray = [u8; MAX_CHUNCK];
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Chunk {
+    position: i32,
+    #[serde(with = "BigArray")]
+    packet: PacketArray,
+}
 
 fn shift_left(array: &mut [u8; BUFFER_SIZE], positions: usize) {
     let len = array.len();
@@ -30,7 +39,7 @@ fn shift_left(array: &mut [u8; BUFFER_SIZE], positions: usize) {
 async fn server1(server_address: &str, _middleware_address: &str) {
     let mut image_data: Vec<u8> = Vec::new();
     let parts: Vec<&str> = server_address.split(':').collect();
-    let port = parts[1]
+    let _port = parts[1]
         .parse::<u16>()
         .expect("Failed to parse port as u16");
     let server_address: SocketAddr = server_address
@@ -44,11 +53,17 @@ async fn server1(server_address: &str, _middleware_address: &str) {
 
     let mut buffer = [0; BUFFER_SIZE];
 
-    while let Ok((_bytes_received, client_address)) = socket.recv_from(&mut buffer).await {
+    while let Ok((_bytes_received, _client_address)) = socket.recv_from(&mut buffer).await {
         //sleep(Duration::from_millis(7000)).await;
         // Send the response to the client's middleware
+        
+        let packet_string = String::from_utf8_lossy(&buffer[0.._bytes_received]);
+        let deserialized: Chunk = serde_json::from_str(&packet_string).unwrap();
+        shift_left(&mut buffer, _bytes_received);
 
-        image_data.extend_from_slice(&buffer[.._bytes_received]);
+        
+
+        // image_data.extend_from_slice(deserialized.packet);
     }
 
     let _ = fs::write("image.png", &image_data);
@@ -73,8 +88,6 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
     {
         println!("Entered Here 1");
 
-        println!("{:?}", receive_buffer);
-
         server_to_server_socket
             .connect("127.0.0.3:8080")
             .await
@@ -96,7 +109,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
             .expect("Failed to send index to server 3");
 
         if current_server == 0 {
-            current_server =0;
+            current_server = 0;
         } else if current_server == 1 {
             current_server = 0;
         } else if current_server == 2 {
@@ -122,10 +135,10 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
         send_buffer[..bytes_received].copy_from_slice(&receive_buffer[..bytes_received]);
 
         server_socket
-            .send_to(&send_buffer[0..MAX_PACKET_SIZE], &server_address)
+            .send_to(&send_buffer[0..bytes_received], &server_address)
             .await
             .expect("Failed to send data to server");
-        shift_left(&mut send_buffer, MAX_PACKET_SIZE);
+        shift_left(&mut send_buffer, bytes_received);
 
         println!("Entered Here 2");
 
