@@ -1,5 +1,6 @@
 use async_std::net::UdpSocket;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::net::SocketAddr;
 use tokio::signal::unix::{signal, SignalKind};
@@ -52,16 +53,19 @@ async fn server1(server_address: &str, _middleware_address: &str) {
     println!("Server 1 socket is listening on {}", server_address);
 
     let mut buffer = [0; BUFFER_SIZE];
+    let mut image_chunks = HashMap::<i32, PacketArray>::new();
 
     while let Ok((_bytes_received, _client_address)) = socket.recv_from(&mut buffer).await {
         //sleep(Duration::from_millis(7000)).await;
         // Send the response to the client's middleware
-        
+
         let packet_string = String::from_utf8_lossy(&buffer[0.._bytes_received]);
         let deserialized: Chunk = serde_json::from_str(&packet_string).unwrap();
         shift_left(&mut buffer, _bytes_received);
 
-        
+        println!("{:?}", deserialized);
+
+        // image_chunks.insert(deserialized.position, deserialized.packet);
 
         // image_data.extend_from_slice(deserialized.packet);
     }
