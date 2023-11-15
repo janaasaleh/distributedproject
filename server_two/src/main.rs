@@ -1,10 +1,40 @@
+use std::collections::HashSet;
+use std::sync::{Arc, Mutex};
 use async_std::net::UdpSocket;
-use async_std::task;
-use std::net::SocketAddr;
-use std::time::Duration;
-use tokio::time::sleep;
+use tokio::time::{Duration, Instant};
+use image::GenericImageView; 
 
-async fn server2(server_address: &str, middleware_address: &str, server_addresses: Vec<&str>) {
+use std::net::SocketAddr;
+
+const BUFFER_SIZE: usize = 140000;
+const MAX_PACKET_SIZE: usize = 1400;
+const ELECTION_TIMEOUT: Duration = Duration::from_secs(10);
+const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
+
+#[derive(Clone)]
+struct ServerState {
+    is_leader: bool,
+    is_active: bool,
+    active_servers: HashSet<String>,
+}
+
+async fn send_image(
+    socket: &UdpSocket,
+    image_data: &[u8],
+    destination: &SocketAddr,
+    max_packet_size: usize,
+) -> Result<(), std::io::Error> {
+    for chunk in image_data.chunks(max_packet_size) {
+        socket
+            .send_to(chunk, destination)
+            .await
+            .expect("Failed to send image chunk");
+    }
+
+    Ok(())
+}
+
+async fn server2(server_address: &str, middleware_address: &SocketAddr, state: Arc<Mutex<ServerState>>) {
     let parts: Vec<&str> = server_address.split(':').collect();
     let port = parts[1]
         .parse::<u16>()
@@ -16,157 +46,254 @@ async fn server2(server_address: &str, middleware_address: &str, server_addresse
     let socket = UdpSocket::bind(&server_address)
         .await
         .expect("Failed to bind server socket");
-    println!("Server 2 socket is listening on {}", server_address);
 
-    let mut buffer = [0; 1024];
+    let mut buffer = [0; BUFFER_SIZE];
+    let mut image_chunks: Vec<u8> = Vec::new();
 
-    while let Ok((bytes_received, client_address)) = socket.recv_from(&mut buffer).await {
-        let message = String::from_utf8_lossy(&buffer);
-        println!("Server 2 received: {}", message);
+    while let Ok((_bytes_received, client_address)) = socket.recv_from(&mut buffer).await {
+        let chunk = &buffer[.._bytes_received];
+        image_chunks.extend_from_slice(chunk);
 
-        let response = match port {
-            54322 => "Server 2 received your message",
-            _ => "Server 2 received your message",
-        };
+        if chunk.len() < BUFFER_SIZE {
+            let image_result = image::load_from_memory(&image_chunks);
+            if let Ok(mut image) = image_result {
+                if let Err(err) =
+                    send_image(&socket, &image_chunks, middleware_address, MAX_PACKET_SIZE).await
+                {
+                    eprintln!(
+                        "Server 3 failed to send processed image to middleware: {}",
+                        err
+                    );
+                } else {
+                    println!("Server 3 sent processed image back to middleware");
+                }
+            } else {
+                eprintln!("Failed to load received image");
+            }
+            image_chunks.clear();
+        }
 
-        println!("Server 2 responding with: {}", response);
-        //sleep(Duration::from_millis(7000)).await;
-        // Send the response to the client's middleware
-        if let Err(err) = socket.send_to(response.as_bytes(), client_address).await {
+        if let Err(err) = socket
+            .send_to(&buffer[.._bytes_received], client_address)
+            .await
+        {
             eprintln!(
-                "Server 2 failed to send acknowledgment to middleware: {}",
+                "Server 3 failed to send acknowledgment to middleware: {}",
                 err
             );
         }
         println!("Middleware address {}", client_address);
-        // Clear the buffer for the next request
-        buffer = [0; 1024];
-    }
-
-    // Simulate a server failure (for example, after some time)
-    //sleep(Duration::from_secs(10)).await;
-
-    // Notify other servers about the failure
-    let server_notify_socket = UdpSocket::bind("127.0.0.3:0")
-        .await
-        .expect("Failed to bind server notify socket");
-
-    let message = "Server 2 is down";
-    for addr in &server_addresses {
-        let server_address: SocketAddr = addr.parse().expect("Failed to parse server address");
-        if server_address != server_address {
-            server_notify_socket
-                .send_to(message.as_bytes(), server_address)
-                .await
-                .expect("Failed to send notification");
-        }
+        buffer = [0; BUFFER_SIZE];
     }
 }
 
-async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>) {
+async fn server_middleware(
+    middleware_address: &SocketAddr,
+    server_addresses: Vec<&str>,
+    state: Arc<Mutex<ServerState>>,
+) {
     let middleware_socket = UdpSocket::bind(middleware_address)
         .await
         .expect("Failed to bind middleware socket");
+
+        //et middleware_socket = Arc::new(Mutex::new(UdpSocket::bind(middleware_address).await.unwrap()));
+    
+
+    let server_to_server_socket = UdpSocket::bind("127.0.0.3:8080")
+        .await
+        .expect("Failed to bind server to server socket");
+
+    server_to_server_socket
+        .connect("127.0.0.4:8080")
+        .await
+        .expect("Failed to connect to Server 2");
+    server_to_server_socket
+        .connect("127.0.0.2:8080")
+        .await
+        .expect("Failed to connect to Server 1");
+
     println!("Server middleware is listening on {}", middleware_address);
-    let mut current_server = 0;
-    let mut receive_buffer = [0; 1024];
-    let mut send_buffer = [0; 1024]; // Separate buffer for sending data
 
-    while let Ok((bytes_received, client_address)) =
-        middleware_socket.recv_from(&mut receive_buffer).await
-    {
+    let mut current_server: i32 = 2;
+    let mut receive_buffer = [0; BUFFER_SIZE];
+   
+   
+    
+    while let Ok((bytes_received, client_address)) = middleware_socket.recv_from(&mut receive_buffer).await {
         println!("Entered Here 1");
+        println!("Received message from client");
+        if state.lock().unwrap().is_active {
+        let message = String::from_utf8_lossy(&receive_buffer[..bytes_received]);
+        println!("Client message: {}", message);
 
-        if (current_server == 0) {
-            current_server += 1;
-        } else if current_server == 1 {
-            current_server += 1;
-            continue;
-        } else if current_server == 2 {
-            current_server = 0;
-            continue;
+        // Handle client request (example: just echoing back the message)
+        let response_message = format!("Server received: {}", message);
+
+        // Send the response back to the client
+        middleware_socket
+            .send_to(response_message.as_bytes(), client_address)
+            .await
+            .expect("Failed to send response to client");
+       
+
+
+        println!("Entered Here 1");
+    } else {
+        // If the server is not active, send the client request to the next active server
+        if !state.lock().unwrap().is_leader {
+            startelection(
+                server_addresses.clone(),
+                state.clone(),
+                &server_to_server_socket,
+            )
+            .await;
+        } else {
+            redistribute_workload(state.clone(), server_addresses.clone(), &server_to_server_socket,&receive_buffer, bytes_received).await;
         }
 
-        //continue;
-        let server_index = 0; // You can implement load balancing logic here
-        let server_address = server_addresses[server_index];
-        let server_address: SocketAddr = server_address
-            .parse()
-            .expect("Failed to parse server address");
+    // if state.lock().unwrap().is_leader {
+    //     redistribute_workload(state.clone(), server_addresses.clone(),&server_to_server_socket).await;
+    // }
 
-        let mut server_socket = UdpSocket::bind("127.0.0.3:0")
-            .await
-            .expect("Failed to bind server socket");
-        server_socket
-            .connect(&server_address)
-            .await
-            .expect("Failed to connect to the server");
-
-        // Copy the received data to the send buffer
-        send_buffer[..bytes_received].copy_from_slice(&receive_buffer[..bytes_received]);
-
-        server_socket
-            .send_to(&send_buffer[..bytes_received], &server_address)
-            .await
-            .expect("Failed to send data to server");
-        println!("Entered Here 2");
-
-        let (ack_bytes_received, server_caddress) = server_socket
-            .recv_from(&mut receive_buffer)
-            .await
-            .expect("Failed to receive acknowledgment from server");
-        println!("Entered Here 3");
-        println!("Server address {}", server_caddress);
-
-        // Send the acknowledgment from the server to the client's middleware
-        middleware_socket
-            .send_to(&receive_buffer[..ack_bytes_received], client_address)
-            .await
-            .expect("Failed to send acknowledgment to client");
-        println!("Entered Here 4");
-
-        // Clear the receive buffer for the next request
-        receive_buffer = [0; 1024];
-    }
+    println!("Entered Here 1");
+}
+}
 }
 
-async fn serverStateNotif(server_address: &str, notify_address: &str) {
-    let server_notify_socket = UdpSocket::bind(notify_address)
-        .await
-        .expect("Failed to bind server notify socket");
+async fn redistribute_workload(
+    state: Arc<Mutex<ServerState>>,
+    server_addresses: Vec<&str>,
+    server_to_server_socket: &UdpSocket,
+    receive_buffer: &[u8],
+    bytes_received: usize,
+) {
+    let my_address = state.lock().unwrap().active_servers.iter().next().unwrap().to_string();
+    let active_servers = state.lock().unwrap().active_servers.clone();
+    let mut server_iter = server_addresses.iter().cycle().skip_while(|&&addr| addr != my_address);
 
-    let mut receive_buffer = [0; 1024];
+    // Find the next active server in a cyclic manner
+    let next_active_server = server_iter.find(|&&addr| active_servers.contains(addr));
 
-    while let Ok((bytes_received, _)) = server_notify_socket.recv_from(&mut receive_buffer).await {
-        let message = String::from_utf8_lossy(&receive_buffer[..bytes_received]);
-        println!("Received notification: {}", message);
-        //implement failure handling here
-        //just logging the message.
+    if let Some(server_address) = next_active_server {
+        let workload_message = format!("request redistributed to {}", server_address);
+
+    if let Some(&server_address) = next_active_server {
+        let workload_message = format!("Workload redistributed to {}", server_address);
+
+        // Use the appropriate server-to-server socket based on the server address
+        match server_address {
+            "127.0.0.2:54321" => {
+                server_to_server_socket
+                    .send_to(workload_message.as_bytes(), "127.0.0.2:8080")
+                    .await
+                    .expect("Failed to redistribute workload");
+            }
+            "127.0.0.3:54322" => {
+                server_to_server_socket
+                    .send_to(workload_message.as_bytes(), "127.0.0.3:8080")
+                    .await
+                    .expect("Failed to redistribute workload");
+            }
+            _ => {
+                // Handle the case where the next active server is not Server 2 or Server 3
+                println!("Unknown server address: {}", server_address);
+            }
+          
+        }
+    } else {
+        // Handle the case where there is no next active server
+        println!("No next active server found.");
     }
 }
+}
+
+async fn startelection(
+    server_addresses: Vec<&str>,
+    state: Arc<Mutex<ServerState>>,
+    server_to_server_socket:&UdpSocket,
+) {
+    let my_address = server_addresses[2];
+    let my_index: i32 = my_address.chars().last().unwrap().to_digit(10).unwrap() as i32;
+
+    for &server_address in server_addresses.iter() {
+        let server_index: i32 = server_address.chars().last().unwrap().to_digit(10).unwrap() as i32;
+        if server_index > my_index {
+            let election_message = format!("ELECTION {}", my_index);
+
+            // Use the appropriate server-to-server socket based on the server index
+            match server_index {
+                3 => {
+                    server_to_server_socket
+                        .send_to(election_message.as_bytes(),"127.0.0.4:8080")
+                        .await
+                        .expect("Failed to send election message");
+                }
+                _ => {
+                    // Use the default socket for Server 1 (index 1)
+                    server_to_server_socket
+                        .send_to(election_message.as_bytes(), "127.0.0.2:8080")
+                        .await
+                        .expect("Failed to send election message");
+                }
+            }
+        }
+    }
+
+    let mut receive_buffer = [0; BUFFER_SIZE];
+    let mut ack_received = false;
+    let timeout = Instant::now() + ELECTION_TIMEOUT;
+
+    while Instant::now() < timeout {
+        match server_to_server_socket.recv_from(&mut receive_buffer).await {
+            Ok((bytes_received, _)) => {
+                let message = &receive_buffer[..bytes_received];
+                if message == b"ELECTION_ACK" {
+                    ack_received = true;
+                    break;
+                }
+            }
+            Err(_) => {
+                eprintln!("Error receiving acknowledgment message from Servers");
+            }
+        }
+    
+    if ack_received {
+        state.lock().unwrap().is_leader = false;
+    } else {
+        state.lock().unwrap().is_leader = true;
+    }
+
+    println!(
+        "Server {} completed the electionand is the leader: {}",
+        my_index,
+        state.lock().unwrap().is_leader
+    );
+}
+}
+
+
+use std::thread;
+
 #[tokio::main]
 async fn main() {
     let middleware_address: SocketAddr = "127.0.0.3:21111"
         .parse()
         .expect("Failed to parse middleware address");
-    let middleware_address_str = middleware_address.to_string();
 
-    // Define the server addresses and middleware addresses
     let server_addresses = ["127.0.0.2:54321", "127.0.0.3:54322", "127.0.0.4:54323"];
-    let server_notify_address = "127.0.0.5:54322"; // A separate address for server notifications
+    let state = Arc::new(Mutex::new(ServerState {is_leader:false,active_servers:HashSet::new(), is_active: true }));
 
-    // Start the server notification task
-    let server_notify_task = serverStateNotif(&server_addresses[1], server_notify_address);
 
-    // Start the server1
-    let server2_task = server2(
-        "127.0.0.3:54323",
-        &middleware_address_str,
-        server_addresses.to_vec(),
-    );
+  
 
-    // Start the server middleware
-    let server_middleware_task =
-        server_middleware(&middleware_address_str, server_addresses.to_vec());
-    let _ = tokio::join!(server2_task, server_notify_task, server_middleware_task);
+let builder = thread::Builder::new().stack_size(32 * 1024 * 1024); // Set a larger stack size (e.g., 32MB)
+    builder.spawn(move || {
+        tokio::runtime::Runtime::new().unwrap().block_on(async {
+            let server2_task = server2("127.0.0.3:54322", &middleware_address, state.clone());
+            let server_middleware_task =
+                server_middleware(&middleware_address, server_addresses.to_vec(), state.clone());
+            let _ = tokio::join!(server2_task, server_middleware_task);
+        });
+    }).unwrap().join().unwrap();
 }
+
