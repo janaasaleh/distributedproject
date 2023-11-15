@@ -36,7 +36,6 @@ fn shift_left(array: &mut [u8; BUFFER_SIZE], positions: usize) {
 }
 
 async fn server1(server_address: &str, _middleware_address: &str) {
-    let mut image_data: Vec<u8> = Vec::new();
     let parts: Vec<&str> = server_address.split(':').collect();
     let _port = parts[1]
         .parse::<u16>()
@@ -51,6 +50,7 @@ async fn server1(server_address: &str, _middleware_address: &str) {
     println!("Server 1 socket is listening on {}", server_address);
 
     let mut buffer = [0; BUFFER_SIZE];
+    let mut image_data: Vec<u8> = Vec::new();
     let mut image_chunks = HashMap::<i32, PacketArray>::new();
 
     while let Ok((_bytes_received, _client_address)) = socket.recv_from(&mut buffer).await {
@@ -63,7 +63,7 @@ async fn server1(server_address: &str, _middleware_address: &str) {
 
         println!("{:?}", deserialized);
 
-        // image_chunks.insert(deserialized.position, deserialized.packet);
+        image_chunks.insert(deserialized.position, deserialized.packet);
 
         // image_data.extend_from_slice(deserialized.packet);
 
@@ -77,7 +77,6 @@ async fn server1(server_address: &str, _middleware_address: &str) {
     }
 
     // let _ = fs::write("image.png", &image_data);
-    buffer = [0; BUFFER_SIZE];
 }
 
 async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>) {

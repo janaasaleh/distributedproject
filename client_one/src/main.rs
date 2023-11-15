@@ -181,14 +181,15 @@ async fn main() {
             .read_line(&mut input)
             .expect("Failed to read line");
         if input.trim() == "" {
-            let image_data = fs::read("image1.png").expect("Failed to read the image file");
+            let image_data = fs::read("image.jpg").expect("Failed to read the image file");
             let middleware_address = "127.0.0.8:12345"; // Replace with the actual middleware address and port
                                                         //sleep(Duration::from_millis(5000)).await;
 
             let mut i = 1;
-            for piece in image_data.chunks(MAX_CHUNCK) {
+            for (index, piece) in image_data.chunks(MAX_CHUNCK).enumerate() {
+                let is_last_piece = index == image_data.len() / MAX_CHUNCK;
                 let chunk = Chunk {
-                    position: i,
+                    position: if is_last_piece {-1} else {i},
                     packet: {
                         let mut packet_array = [0; MAX_CHUNCK];
                         packet_array[..piece.len()].copy_from_slice(piece);
