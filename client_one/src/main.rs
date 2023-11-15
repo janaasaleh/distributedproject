@@ -6,6 +6,7 @@ use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::broadcast;
 use std::thread;
 use std::sync::{Arc, Mutex};
+use tokio::time::timeout;
 
 async fn middleware_task(mut middleware_socket: UdpSocket) {
     let server_addresses = ["127.0.0.2:21112", "127.0.0.3:21111", "127.0.0.4:21113"];
@@ -19,7 +20,7 @@ async fn middleware_task(mut middleware_socket: UdpSocket) {
         {
             println!("Yo1");
             println!("Yo2");
-            let server_socket = UdpSocket::bind("127.0.0.8:0")
+            let server_socket = UdpSocket::bind("127.0.0.8:4000")
                 .await
                 .expect("Failed to bind server socket");
             for server_address in &server_addresses {
@@ -37,11 +38,16 @@ async fn middleware_task(mut middleware_socket: UdpSocket) {
                     .expect("Failed to send data to server");
                 println!("Yo4");
             }
-            println!("Yo5");
-            let (ack_bytes_received, server_address) = server_socket
-            .recv_from(&mut ack_buffer)
-            .await
-            .expect("Failed to receive acknowledgment from server");
+            let timeout_duration = Duration::from_secs(1);
+
+            match timeout(timeout_duration, server_socket.recv_from(&mut ack_buffer)).await {
+                Ok(Ok((ack_bytes_received, server_address))) => {
+                }
+                Ok(Err(e)) => {
+                }
+                Err(_) => {
+                }
+            }
             middleware_socket
                 .send_to(&ack_buffer, client_address)
                 .await
@@ -133,7 +139,7 @@ async fn main() {
         if input.trim() == "" {
             for i in 1..10000
             {
-            if(i%100==0)
+            if(i%90==0)
             {
                 sleep(Duration::from_millis(10)).await;
             }
