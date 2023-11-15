@@ -49,45 +49,448 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
     let server_to_server_socket = UdpSocket::bind("127.0.0.3:8080")
         .await
         .expect("Failed to bind server to server socket");
+    let just_up_socket = UdpSocket::bind("127.0.0.3:8087")
+        .await
+        .expect("Failed to bind server to server socket");
+    let skip_socket = UdpSocket::bind("127.0.0.3:8088")
+        .await
+        .expect("Failed to bind server to server socket");
 
+    let mut server_down=0;
+    let mut real_server_down=0;
+    let mut server_down_index:i32=11;
+    let mut server_up_index:i32=21;
+    let mut own_down:i32=0;
+    let mut which_server:i32=500;
+    let mut just_up:i32=0;
+    let mut previous_down:i32=0;
+    let mut just_slept:i32=0;
+    let mut server_down_requests:i32=0;
+    let mut num_down:i32=0;
     println!("Server middleware is listening on {}", middleware_address);
-    let mut current_server = 0;
+    let mut current_server:i32 = 0;
     let mut receive_buffer = [0; 1024];
     let mut send_buffer = [0; 1024]; // Separate buffer for sending data
     while let Ok((bytes_received, client_address)) =
         middleware_socket.recv_from(&mut receive_buffer).await
     {
+        println!("Just Slept:{}",just_slept);
+        if(just_slept==1)
+        {
+            just_slept=0;
+            continue;
+        }
+        else if just_slept>1
+        {
+            just_slept=just_slept-1;
+            continue;
+        }
+        else {
+            just_slept=0;
+        }
+        if(which_server==2)
+        {
+            server_down_requests+=1;
+        }
+        if(which_server==500)
+        {
+            server_down_requests=0;
+        }
+        println!("Current Server: {}",current_server);
         println!("Entered Here 1");
+        println!("SDR:{}",server_down_requests);
 
-        let mut server_to_server_receive_buffer = [0; 4];
+        let mut rng = rand::thread_rng();
+        let random_number: u32 = rng.gen_range(0..10);
+        let index: &[u8] = &current_server.to_be_bytes();
+        let down_index: &[u8] = &server_down_index.to_be_bytes();
+        let up_index: &[u8] = &server_up_index.to_be_bytes();
 
+        let mut server_to_server1_receive_buffer = [0; 4];
+        let mut server_to_server2_receive_buffer = [0; 4];
+        let mut just_up_receive_buffer = [0; 4];
+
+
+        //server_to_server_socket
+        //.connect("127.0.0.2:8080")
+        //.await
+        //.expect("Failed to connect to the server");
+//
+        //server_to_server_socket
+        //.connect("127.0.0.4:8080")
+        //.await
+        //.expect("Failed to connect to the server");
+        if random_number < 2 && server_down==0 && real_server_down==0 && previous_down==0{
+        server_down=0;
+        own_down=1;
         server_to_server_socket
-            .recv_from(&mut server_to_server_receive_buffer)
+            .send_to(down_index, "127.0.0.2:8080")
             .await
-            .expect("Couldn't recieve index");
-
-        let index = i32::from_be_bytes([
-            server_to_server_receive_buffer[0],
-            server_to_server_receive_buffer[1],
-            server_to_server_receive_buffer[2],
-            server_to_server_receive_buffer[3],
-        ]);
-
-        println!("Index recieved {}", index);
-
-        if index != current_server {
-            current_server = index;
+            .expect("Failed to send index to server 1");
+        server_to_server_socket
+            .send_to(down_index, "127.0.0.4:8080")
+            .await
+            .expect("Failed to send index to server 3");
+        println!("Server 2 going down!");
+        }
+        else {
+            if(which_server==500)
+            {
+            server_to_server_socket
+            .send_to(index, "127.0.0.2:8080")
+            .await
+            .expect("Failed to send index to server 1");
+            server_to_server_socket
+            .send_to(index, "127.0.0.4:8080")
+            .await
+            .expect("Failed to send index to server 3");
+            }
+            else if which_server==0
+            {
+                server_to_server_socket
+            .send_to(index, "127.0.0.4:8080")
+            .await
+            .expect("Failed to send index to server 3");
+            }
+            else if which_server==2
+            {
+                server_to_server_socket
+            .send_to(index, "127.0.0.2:8080")
+            .await
+            .expect("Failed to send index to server 1");
+            }
         }
 
+
+        server_to_server_socket
+            .recv_from(&mut server_to_server1_receive_buffer)
+            .await
+            .expect("Couldn't recieve index");
+        let mut index1 = i32::from_be_bytes([
+            server_to_server1_receive_buffer[0],
+            server_to_server1_receive_buffer[1],
+            server_to_server1_receive_buffer[2],
+            server_to_server1_receive_buffer[3],
+        ]);
+
+        if(server_down==0 || index1>19)
+        {
+        server_to_server_socket
+            .recv_from(&mut server_to_server2_receive_buffer)
+            .await
+            .expect("Couldn't recieve index");
+        }
+
+
+        let mut index2 = i32::from_be_bytes([
+            server_to_server2_receive_buffer[0],
+            server_to_server2_receive_buffer[1],
+            server_to_server2_receive_buffer[2],
+            server_to_server2_receive_buffer[3],
+        ]);
+
+        println!("Index recieved {}", index1);
+        println!("Index recieved {}", index2);
+
+        if(index1>9 && index1<20 && index2>9 && index2<20 && own_down==1)
+        {
+            index1=current_server;
+            index2=current_server;
+            own_down=0;
+            println!("All 3 servers requested sleep. Overturned!")
+        }
+        else if((own_down==1 && index1>9 && index1<20))
+        {
+            own_down=0;
+            index1=current_server;
+            println!("2 servers requested sleep. Overturned!")
+        }
+        else if((own_down==1 && index2>9 && index2<20))
+        {
+            own_down=0;
+            index2=current_server;
+            println!("2 servers requested sleep. Overturned!")
+        }
+        else if(index1>9 && index1<20 && index2>9 && index2<20 && own_down==0)
+        {
+            index1=current_server;
+            index2=current_server;
+            println!("2 servers not me requested sleep. Overturned!")
+        }
+
+        if (index1>9)
+        {
+            if index1<19
+            {
+                if(index1 == 10)
+                {
+                    println!("Server 1 is down");
+                    server_down=1;
+                    which_server=0;
+                }
+                if(index1 == 12)
+                {
+                    println!("Server 3 is down");
+                    server_down=1;
+                    which_server=2;
+                }
+
+            }
+            else {
+                if index1==20
+                {
+                    println!("Server 1 is back up");
+                    server_down=0;
+                    which_server=500;
+                }
+                if index1==22
+                {
+                    println!("Server 3 is back up");
+                    server_down=0;
+                    which_server=500;
+                    just_up=1;
+                }
+               
+            }
+
+        }
+        if (index2>9)
+        {
+            if index2<19
+            {
+                if(index2 == 10)
+                {
+                    println!("Server 1 is down");
+                    server_down=1;
+                    which_server=0;
+                }
+                if(index2 == 12)
+                {
+                    println!("Server 3 is down");
+                    server_down=1;
+                    which_server=2;
+                }
+
+            }
+            else {
+                if index2==20
+                {
+                    println!("Server 1 is back up");
+                    server_down=0;
+                    which_server=500;
+                }
+                if index2==22
+                {
+                    println!("Server 3 is back up");
+                    server_down=0;
+                    which_server=500;
+                    just_up=1;
+                }
+               
+            }
+
+        }
+
+        if(which_server==500)
+        {
+        if current_server == 0
+        {
+            current_server += 1;
+            if(just_up==1)
+            {
+            let cs: &[u8] = &current_server.to_be_bytes();
+            server_to_server_socket
+            .send_to(cs, "127.0.0.4:8087")
+            .await.expect("Failed to send index to server 3");
+            let sdr: &[u8] = &server_down_requests.to_be_bytes();
+            server_to_server_socket
+            .send_to(sdr, "127.0.0.4:8088")
+            .await.expect("Failed to send index to server 3");
+           
+            //server_to_server_socket
+            //.send_to(cs, "127.0.0.4:8080")
+            //.await.expect("Failed to send index to server 3");
+            just_up=0;
+            }
+            if(own_down==1)
+            {
+            tokio::time::sleep(Duration::from_secs(40)).await;
+            previous_down=6;
+            println!("Server 2 going up!");
+            server_to_server_socket
+            .send_to(up_index, "127.0.0.2:8080")
+            .await
+            .expect("Failed to send index to server 1");
+            server_to_server_socket
+            .send_to(up_index, "127.0.0.4:8080")
+            .await
+            .expect("Failed to send index to server 2");
+            own_down=0;
+            server_down=0;
+            just_up_socket
+            .recv_from(&mut just_up_receive_buffer)
+            .await
+            .expect("Couldn't recieve index");
+            current_server=i32::from_be_bytes([
+                just_up_receive_buffer[0],
+                just_up_receive_buffer[1],
+                just_up_receive_buffer[2],
+                just_up_receive_buffer[3],
+            ]);
+            just_up_receive_buffer = [0; 4];
+            skip_socket
+            .recv_from(&mut just_up_receive_buffer)
+            .await
+            .expect("Couldn't recieve index");
+            just_slept=i32::from_be_bytes([
+            just_up_receive_buffer[0],
+            just_up_receive_buffer[1],
+            just_up_receive_buffer[2],
+            just_up_receive_buffer[3],
+            ]);
+            //current_server=1-current_server;
+            if(just_slept>90)
+            {
+                just_slept=93;
+            }
+            println!("Current Server Down {}",current_server);
+            println!("I am here");
+            just_up_receive_buffer = [0; 4];
+            //receive_buffer = [0; 1024];
+            //receive_buffer = [0; 1024];
+            num_down+=1;
+            if(num_down>1)
+            {
+                //just_slept=just_slept+1;
+                just_slept=just_slept;
+            }
+            }
+            continue;
+        }
+        else if current_server == 1{
+            if(just_up==1)
+            {
+                current_server+=1;
+                let cs: &[u8] = &current_server.to_be_bytes();
+                server_to_server_socket
+                .send_to(cs, "127.0.0.4:8087")
+                .await.expect("Failed to send index to server 3");
+            let sdr: &[u8] = &server_down_requests.to_be_bytes();
+            server_to_server_socket
+            .send_to(sdr, "127.0.0.4:8088")
+            .await.expect("Failed to send index to server 3");
+                //server_to_server_socket
+                //.send_to(cs, "127.0.0.4:8080")
+                //.await.expect("Failed to send index to server 3");
+                just_up=0;
+            }
+            else {
+                current_server += 1;
+               
+            }
+        } else if current_server == 2{
+            current_server = 0;
+            if(just_up==1)
+            {
+            let cs: &[u8] = &current_server.to_be_bytes();
+            server_to_server_socket
+            .send_to(cs, "127.0.0.4:8087")
+            .await.expect("Failed to send index to server 3");
+            let sdr: &[u8] = &server_down_requests.to_be_bytes();
+            server_to_server_socket
+            .send_to(sdr, "127.0.0.4:8088")
+            .await.expect("Failed to send index to server 3");
+            //server_to_server_socket
+            //.send_to(cs, "127.0.0.4:8080")
+            //.await.expect("Failed to send index to server 3");
+            just_up=0;
+            }
+            if(own_down==1)
+            {
+            tokio::time::sleep(Duration::from_secs(40)).await;
+            previous_down=6;
+            println!("Server 2 going up!");
+            server_to_server_socket
+            .send_to(up_index, "127.0.0.2:8080")
+            .await
+            .expect("Failed to send index to server 1");
+            server_to_server_socket
+            .send_to(up_index, "127.0.0.4:8080")
+            .await
+            .expect("Failed to send index to server 2");
+            own_down=0;
+            server_down=0;
+            just_up_socket
+            .recv_from(&mut just_up_receive_buffer)
+            .await
+            .expect("Couldn't recieve index");
+            current_server=i32::from_be_bytes([
+                just_up_receive_buffer[0],
+                just_up_receive_buffer[1],
+                just_up_receive_buffer[2],
+                just_up_receive_buffer[3],
+            ]);
+            just_up_receive_buffer = [0; 4];
+            skip_socket
+            .recv_from(&mut just_up_receive_buffer)
+            .await
+            .expect("Couldn't recieve index");
+            just_slept=i32::from_be_bytes([
+            just_up_receive_buffer[0],
+            just_up_receive_buffer[1],
+            just_up_receive_buffer[2],
+            just_up_receive_buffer[3],
+            ]);
+            //current_server=1-current_server;
+            if(just_slept>90)
+            {
+                just_slept=93;
+            }
+            println!("Current Server Down {}",current_server);
+            println!("I am here");
+            just_up_receive_buffer = [0; 4];
+            //receive_buffer = [0; 1024];
+            //receive_buffer = [0; 1024];
+            num_down+=1;
+            if(num_down>1)
+            {
+                //just_slept=just_slept+1;
+                just_slept=just_slept;
+            }
+            }
+            continue;
+           
+        }
+    }
+    else if (which_server==0)
+    {
+
+        if current_server == 0 && which_server==0{
+            current_server += 1;
+            continue;
+        } else if current_server == 1 && which_server==0{
+            current_server += 1;
+        } else if current_server == 2 && which_server==0{
+            current_server = 1;
+            continue;
+        }
+    }
+    else if (which_server==2)
+    {
         if current_server == 0 {
             current_server += 1;
             continue;
-        } else if current_server == 1 {
-            current_server += 1;
-        } else if current_server == 2 {
+        } else if current_server == 1{
+            current_server = 0;
+        } else if current_server == 2{
             current_server = 0;
             continue;
         }
+    }
+    else {
+        println!("No which server variable");
+    }
+
         let server_index = 1; // You can implement load balancing logic here
         let server_address = server_addresses[server_index];
         let server_address: SocketAddr = server_address
@@ -124,10 +527,66 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
             .await
             .expect("Failed to send acknowledgment to client");
         println!("Entered Here 4");
+        println!("Client Address:{}",client_address);
 
         // Clear the receive buffer for the next request
-        server_to_server_receive_buffer = [0; 4];
+        server_to_server1_receive_buffer = [0; 4];
+        server_to_server2_receive_buffer = [0; 4];
         receive_buffer = [0; 1024];
+        if(own_down==1)
+        {
+            tokio::time::sleep(Duration::from_secs(40)).await;
+            previous_down=6;
+            println!("Server 2 going up!");
+            server_to_server_socket
+            .send_to(up_index, "127.0.0.2:8080")
+            .await
+            .expect("Failed to send index to server 1");
+            server_to_server_socket
+            .send_to(up_index, "127.0.0.4:8080")
+            .await
+            .expect("Failed to send index to server 2");
+            own_down=0;
+            server_down=0;
+            just_up_socket
+            .recv_from(&mut just_up_receive_buffer)
+            .await
+            .expect("Couldn't recieve index");
+            current_server=i32::from_be_bytes([
+                just_up_receive_buffer[0],
+                just_up_receive_buffer[1],
+                just_up_receive_buffer[2],
+                just_up_receive_buffer[3],
+            ]);
+            just_up_receive_buffer = [0; 4];
+            skip_socket
+            .recv_from(&mut just_up_receive_buffer)
+            .await
+            .expect("Couldn't recieve index");
+            just_slept=i32::from_be_bytes([
+            just_up_receive_buffer[0],
+            just_up_receive_buffer[1],
+            just_up_receive_buffer[2],
+            just_up_receive_buffer[3],
+            ]);
+            //current_server=1-current_server;
+            if(just_slept>90)
+            {
+                just_slept=93;
+            }
+            println!("Current Server Down {}",current_server);
+            println!("I am here");
+            just_up_receive_buffer = [0; 4];
+            //receive_buffer = [0; 1024];
+            //receive_buffer = [0; 1024];
+            num_down+=1;
+            if(num_down>1)
+            {
+                //just_slept=just_slept+1;
+                just_slept=just_slept;
+            }
+
+        }
     }
 }
 

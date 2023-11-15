@@ -1,1 +1,1 @@
-/home/janasaleh/Documents/distributedproject/client_two/target/debug/client_two: /home/janasaleh/Documents/distributedproject/client_two/src/main.rs
+/mnt/Doma/AUC/Distributed\ systems/project/distributedproject/client_two/target/debug/client_two: /mnt/Doma/AUC/Distributed\ systems/project/distributedproject/client_two/src/main.rs
