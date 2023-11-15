@@ -7,14 +7,14 @@ use std::net::SocketAddr;
 mod big_array;
 use big_array::BigArray;
 
-const BUFFER_SIZE: usize = 10240;
+const BUFFER_SIZE: usize = 65536;
 const MAX_CHUNCK: usize = 256;
 
 type PacketArray = [u8; MAX_CHUNCK];
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Chunk {
-    position: i32,
+    position: i16,
     #[serde(with = "BigArray")]
     packet: PacketArray,
 }
@@ -51,7 +51,8 @@ async fn server1(server_address: &str, _middleware_address: &str) {
 
     let mut buffer = [0; BUFFER_SIZE];
     let mut image_data: Vec<u8> = Vec::new();
-    let mut image_chunks = HashMap::<i32, PacketArray>::new();
+    let mut image_chunks = HashMap::<i16, PacketArray>::new();
+    let mut packet_number: i16 = 1;
 
     while let Ok((_bytes_received, _client_address)) = socket.recv_from(&mut buffer).await {
         //sleep(Duration::from_millis(7000)).await;
@@ -61,11 +62,16 @@ async fn server1(server_address: &str, _middleware_address: &str) {
         let deserialized: Chunk = serde_json::from_str(&packet_string).unwrap();
         shift_left(&mut buffer, _bytes_received);
 
-        println!("{:?}", deserialized);
+        // println!("{:?}", deserialized);
 
-        image_chunks.insert(deserialized.position, deserialized.packet);
+        if deserialized.position != -1 {
+            image_chunks.insert(deserialized.position, deserialized.packet);
+            packet_number += 1;
+        } else {
+            image_chunks.insert(packet_number, deserialized.packet);
 
-        // image_data.extend_from_slice(deserialized.packet);
+            println!("{:?}", image_chunks);
+        }
 
         socket
             .send_to(

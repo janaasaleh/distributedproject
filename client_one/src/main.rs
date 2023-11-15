@@ -9,14 +9,14 @@ use tokio::time::sleep;
 mod big_array;
 use big_array::BigArray;
 
-const BUFFER_SIZE: usize = 10240;
+const BUFFER_SIZE: usize = 65536;
 const MAX_CHUNCK: usize = 256;
 
 type PacketArray = [u8; MAX_CHUNCK];
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Chunk {
-    position: i32,
+    position: i16,
     #[serde(with = "BigArray")]
     packet: PacketArray,
 }
@@ -189,7 +189,7 @@ async fn main() {
             for (index, piece) in image_data.chunks(MAX_CHUNCK).enumerate() {
                 let is_last_piece = index == image_data.len() / MAX_CHUNCK;
                 let chunk = Chunk {
-                    position: if is_last_piece {-1} else {i},
+                    position: if is_last_piece { -1 } else { i },
                     packet: {
                         let mut packet_array = [0; MAX_CHUNCK];
                         packet_array[..piece.len()].copy_from_slice(piece);
@@ -212,6 +212,7 @@ async fn main() {
                     .await
                     .expect("Failed to receive acknowledgment");
             }
+            println!("{}", i)
         }
         if input.trim() == "Q" {
             //let unregister_message = "UNREGISTER";
