@@ -1,8 +1,13 @@
 use async_std::net::UdpSocket;
+use image::{EncodableLayout, GenericImageView};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::fs;
+use std::collections::{BTreeMap, HashMap};
 use std::net::SocketAddr;
+use steganography::decoder::Decoder;
+use steganography::encoder::*;
+use steganography::util::{
+    bytes_to_str, file_as_dynamic_image, file_as_image_buffer, save_image_buffer,
+};
 
 mod big_array;
 use big_array::BigArray;
@@ -31,6 +36,16 @@ fn shift_left(array: &mut [u8; BUFFER_SIZE], positions: usize) {
         // Set the remaining positions to default values
         for i in len - positions..len {
             array[i] = Default::default();
+        }
+    }
+}
+
+fn remove_trailing_zeros(vec: &mut Vec<u8>) {
+    while let Some(&last_element) = vec.last() {
+        if last_element == 0 {
+            vec.pop();
+        } else {
+            break;
         }
     }
 }
@@ -69,8 +84,52 @@ async fn server1(server_address: &str, _middleware_address: &str) {
             packet_number += 1;
         } else {
             image_chunks.insert(packet_number, deserialized.packet);
+            packet_number = 1;
 
-            println!("{:?}", image_chunks);
+            let image_chunks_cloned: BTreeMap<_, _> = image_chunks.clone().into_iter().collect();
+
+            for (_key, value) in image_chunks_cloned {
+                // println!("Key: {}, Value: {:?}", key, value);
+                image_data.extend_from_slice(&value);
+            }
+
+            remove_trailing_zeros(&mut image_data);
+
+            if let Ok(image) = image::load_from_memory(&image_data) {
+                let (width, height) = image.dimensions();
+                println!("Image dimensions: {} x {}", width, height);
+
+                if let Err(err) = image.save("output_image.jpg") {
+                    eprintln!("Failed to save the image: {}", err);
+                } else {
+                    println!("Image saved successfully");
+                }
+            } else {
+                println!("Failed to create image from byte stream");
+            }
+
+            let encryptor = file_as_dynamic_image("encrypt.jpg".to_string());
+            let enc = Encoder::new(&image_data.as_bytes(), encryptor);
+            let result = enc.encode_alpha();
+            save_image_buffer(result, "encrypted.jpg".to_string());
+
+            // let encoded_image = file_as_image_buffer("encrypted.jpg".to_string());
+            // let dec = Decoder::new(encoded_image);
+            // let out_buffer = dec.decode_alpha();
+            // let clean_buffer: Vec<u8> = out_buffer.into_iter().filter(|b| *b != 0xff_u8).collect();
+
+            // if let Ok(decoded_image) = image::load_from_memory(&clean_buffer) {
+            //     let (width, height) = decoded_image.dimensions();
+            //     println!("Image dimensions: {} x {}", width, height);
+
+            //     if let Err(err) = decoded_image.save("decoded.jpg") {
+            //         eprintln!("Failed to save the image: {}", err);
+            //     } else {
+            //         println!("Image saved successfully");
+            //     }
+            // } else {
+            //     println!("Failed to create image from byte stream");
+            // }
         }
 
         socket
@@ -90,7 +149,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
         .await
         .expect("Failed to bind middleware socket");
 
-    // let server_to_server_socket = UdpSocket::bind("10.7.57.74:8080")
+    // let server_to_server_socket = UdpSocket::bind("127.0.0.2:8080")
     //     .await
     //     .expect("Failed to bind server to server socket");
 
@@ -138,7 +197,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
             .parse()
             .expect("Failed to parse server address");
 
-        let server_socket = UdpSocket::bind("10.7.57.74:0")
+        let server_socket = UdpSocket::bind("127.0.0.2:0")
             .await
             .expect("Failed to bind server socket");
         server_socket
@@ -211,14 +270,14 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
 
 #[tokio::main]
 async fn main() {
-    let middleware_address: SocketAddr = "10.7.57.74:21112"
+    let middleware_address: SocketAddr = "127.0.0.2:21112"
         .parse()
         .expect("Failed to parse middleware address");
     let middleware_address_str = middleware_address.to_string();
 
     // Define the server addresses and middleware addresses
-    let server_addresses = ["10.7.57.74:54321", "127.0.0.3:54322", "127.0.0.4:54323"];
-    let server1_task = server1("10.7.57.74:54321", &middleware_address_str);
+    let server_addresses = ["127.0.0.2:54321", "127.0.0.3:54322", "127.0.0.4:54323"];
+    let server1_task = server1("127.0.0.2:54321", &middleware_address_str);
 
     // Start the server middleware
     let server_middleware_task =

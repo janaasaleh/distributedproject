@@ -38,8 +38,8 @@ fn shift_left(array: &mut [u8; BUFFER_SIZE], positions: usize) {
 }
 
 async fn middleware_task(middleware_socket: UdpSocket) {
-    // let server_addresses = ["10.7.57.74:21112", "127.0.0.3:21111", "127.0.0.4:21113"];
-    let server_addresses = ["10.7.57.74:21112"];
+    // let server_addresses = ["127.0.0.2:21112", "127.0.0.3:21111", "127.0.0.4:21113"];
+    let server_addresses = ["127.0.0.2:21112"];
     let mut buffer = [0; BUFFER_SIZE];
     let mut ack_buffer = [0; BUFFER_SIZE];
     //let middleware_address: SocketAddr = "0.0.0.0:12345".parse().expect("Failed to parse middleware address");
@@ -184,7 +184,7 @@ async fn main() {
         if input.trim() == "" {
             let image_data = fs::read("image.jpg").expect("Failed to read the image file");
             let middleware_address = "0.0.0.0:12345"; // Replace with the actual middleware address and port
-                                                        //sleep(Duration::from_millis(5000)).await;
+                                                      //sleep(Duration::from_millis(5000)).await;
 
             let mut i = 1;
             for (index, piece) in image_data.chunks(MAX_CHUNCK).enumerate() {
