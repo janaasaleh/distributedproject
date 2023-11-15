@@ -167,6 +167,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
             .send_to(&receive_buffer[..ack_bytes_received], client_address)
             .await
             .expect("Failed to send acknowledgment to client");
+        shift_left(&mut receive_buffer, ack_bytes_received);
 
         // Clear the receive buffer for the next request
         receive_buffer = [0; BUFFER_SIZE];

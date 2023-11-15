@@ -38,8 +38,8 @@ fn shift_left(array: &mut [u8; BUFFER_SIZE], positions: usize) {
 }
 
 async fn middleware_task(middleware_socket: UdpSocket) {
-    // let server_addresses = ["127.0.0.2:21112", "127.0.0.3:21111", "127.0.0.4:21113"];
-    let server_addresses = ["127.0.0.2:21112"];
+    // let server_addresses = ["10.7.57.74:21112", "127.0.0.3:21111", "127.0.0.4:21113"];
+    let server_addresses = ["10.7.57.74:21112"];
     let mut buffer = [0; BUFFER_SIZE];
     let mut ack_buffer = [0; BUFFER_SIZE];
     //let middleware_address: SocketAddr = "127.0.0.8:12345".parse().expect("Failed to parse middleware address");
@@ -66,14 +66,15 @@ async fn middleware_task(middleware_socket: UdpSocket) {
                     .expect("Failed to send data to server");
                 shift_left(&mut buffer, bytes_received);
             }
-            let (_ack_bytes_received, _server_address) = server_socket
+            let (ack_bytes_received, _server_address) = server_socket
                 .recv_from(&mut ack_buffer)
                 .await
                 .expect("Failed to receive acknowledgment from server");
             middleware_socket
-                .send_to(&ack_buffer, client_address)
+                .send_to(&ack_buffer[0..ack_bytes_received], client_address)
                 .await
                 .expect("Failed to send acknowledgment to client");
+            shift_left(&mut ack_buffer, ack_bytes_received);
 
             println!("Middleware sent packet to server");
 
