@@ -10,7 +10,7 @@ mod big_array;
 use big_array::BigArray;
 
 const BUFFER_SIZE: usize = 65536;
-const MAX_CHUNCK: usize = 256;
+const MAX_CHUNCK: usize = 16384;
 
 type PacketArray = [u8; MAX_CHUNCK];
 
@@ -42,14 +42,14 @@ async fn middleware_task(middleware_socket: UdpSocket) {
     let server_addresses = ["10.7.57.74:21112"];
     let mut buffer = [0; BUFFER_SIZE];
     let mut ack_buffer = [0; BUFFER_SIZE];
-    //let middleware_address: SocketAddr = "127.0.0.8:12345".parse().expect("Failed to parse middleware address");
+    //let middleware_address: SocketAddr = "0.0.0.0:12345".parse().expect("Failed to parse middleware address");
 
     loop {
         if let Ok((bytes_received, client_address)) = middleware_socket.recv_from(&mut buffer).await
         {
             println!("Middleware Received packet");
 
-            let server_socket = UdpSocket::bind("127.0.0.8:0")
+            let server_socket = UdpSocket::bind("0.0.0.0:0")
                 .await
                 .expect("Failed to bind server socket");
             for server_address in &server_addresses {
@@ -126,14 +126,14 @@ async fn middleware_task(middleware_socket: UdpSocket) {
 #[tokio::main]
 async fn main() {
     let dos_address = "127.0.0.255:12345";
-    let middleware_address: SocketAddr = "127.0.0.8:12345"
+    let middleware_address: SocketAddr = "0.0.0.0:12345"
         .parse()
         .expect("Failed to parse middleware address");
-    let client_socket = UdpSocket::bind("127.0.0.8:0")
+    let client_socket = UdpSocket::bind("0.0.0.0:0")
         .await
         .expect("Failed to bind client socket");
-    //let client_socket_register = UdpSocket::bind("127.0.0.8:8090").await.expect("Failed to bind client socket");
-    //let client_socket_query = UdpSocket::bind("127.0.0.8:8091").await.expect("Failed to bind client socket");
+    //let client_socket_register = UdpSocket::bind("0.0.0.0:8090").await.expect("Failed to bind client socket");
+    //let client_socket_query = UdpSocket::bind("0.0.0.0:8091").await.expect("Failed to bind client socket");
     //register_user(client_socket_register,dos_address, "Client1","Client").await;
     //println!("Finished Registry");
     //query_online_users(client_socket_query,dos_address).await;
@@ -158,7 +158,7 @@ async fn main() {
         println!("Received termination signal");
 
         //let unregister_message = "UNREGISTER";
-        //let dos_socket = UdpSocket::bind("127.0.0.8:9000").await.expect("Failed to bind socket");
+        //let dos_socket = UdpSocket::bind("0.0.0.0:9000").await.expect("Failed to bind socket");
         //dos_socket
         //    .send_to(unregister_message.as_bytes(), dos_address_clone)
         //    .await
@@ -183,7 +183,7 @@ async fn main() {
             .expect("Failed to read line");
         if input.trim() == "" {
             let image_data = fs::read("image.jpg").expect("Failed to read the image file");
-            let middleware_address = "127.0.0.8:12345"; // Replace with the actual middleware address and port
+            let middleware_address = "0.0.0.0:12345"; // Replace with the actual middleware address and port
                                                         //sleep(Duration::from_millis(5000)).await;
 
             let mut i = 1;
@@ -217,7 +217,7 @@ async fn main() {
         }
         if input.trim() == "Q" {
             //let unregister_message = "UNREGISTER";
-            //let dos_socket = UdpSocket::bind("127.0.0.8:9001").await.expect("Failed to bind socket");
+            //let dos_socket = UdpSocket::bind("0.0.0.0:9001").await.expect("Failed to bind socket");
             //dos_socket
             //.send_to(unregister_message.as_bytes(), dos_address_clone)
             //.await

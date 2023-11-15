@@ -8,7 +8,7 @@ mod big_array;
 use big_array::BigArray;
 
 const BUFFER_SIZE: usize = 65536;
-const MAX_CHUNCK: usize = 256;
+const MAX_CHUNCK: usize = 16384;
 
 type PacketArray = [u8; MAX_CHUNCK];
 
@@ -90,7 +90,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
         .await
         .expect("Failed to bind middleware socket");
 
-    // let server_to_server_socket = UdpSocket::bind("127.0.0.2:8080")
+    // let server_to_server_socket = UdpSocket::bind("10.7.57.74:8080")
     //     .await
     //     .expect("Failed to bind server to server socket");
 
@@ -138,7 +138,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
             .parse()
             .expect("Failed to parse server address");
 
-        let server_socket = UdpSocket::bind("127.0.0.2:0")
+        let server_socket = UdpSocket::bind("10.7.57.74:0")
             .await
             .expect("Failed to bind server socket");
         server_socket
@@ -211,14 +211,14 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
 
 #[tokio::main]
 async fn main() {
-    let middleware_address: SocketAddr = "127.0.0.2:21112"
+    let middleware_address: SocketAddr = "10.7.57.74:21112"
         .parse()
         .expect("Failed to parse middleware address");
     let middleware_address_str = middleware_address.to_string();
 
     // Define the server addresses and middleware addresses
-    let server_addresses = ["127.0.0.2:54321", "127.0.0.3:54322", "127.0.0.4:54323"];
-    let server1_task = server1("127.0.0.2:54321", &middleware_address_str);
+    let server_addresses = ["10.7.57.74:54321", "127.0.0.3:54322", "127.0.0.4:54323"];
+    let server1_task = server1("10.7.57.74:54321", &middleware_address_str);
 
     // Start the server middleware
     let server_middleware_task =
