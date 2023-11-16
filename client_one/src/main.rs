@@ -21,6 +21,7 @@ type PacketArray = [u8; MAX_CHUNCK];
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Chunk {
+    total_packet_number: usize,
     position: i16,
     #[serde(with = "BigArray")]
     packet: PacketArray,
@@ -53,7 +54,8 @@ fn remove_trailing_zeros(vec: &mut Vec<u8>) {
 }
 
 async fn middleware_task(middleware_socket: UdpSocket) {
-    let server_addresses = ["127.0.0.2:21112", "127.0.0.3:21111", "127.0.0.4:21113"];
+    // let server_addresses = ["127.0.0.2:21112", "127.0.0.3:21111", "127.0.0.4:21113"];
+    let server_addresses = ["127.0.0.2:21112"];
     let mut buffer = [0; BUFFER_SIZE];
     let mut ack_buffer = [0; BUFFER_SIZE];
     //let middleware_address: SocketAddr = "127.0.0.8:12345".parse().expect("Failed to parse middleware address");
@@ -61,10 +63,13 @@ async fn middleware_task(middleware_socket: UdpSocket) {
     // let vector = 0
     // let mut code_zero: String = String::new();
     // code_zero = "AA".to_string();
+    let mut var=0;
 
     while let Ok((_bytes_received, client_address)) = middleware_socket.recv_from(&mut buffer).await
     {
+        var+=1;
         if client_address.ip().to_string() == "127.0.0.8" {
+            println!("Client:{}",var);
             let _server_socket = UdpSocket::bind("127.0.0.8:0")
                 .await
                 .expect("Failed to bind server socket");
@@ -73,20 +78,19 @@ async fn middleware_task(middleware_socket: UdpSocket) {
                     .parse()
                     .expect("Failed to parse server address");
                 middleware_socket
-                    .send_to(&buffer, &server_address)
+                    .send_to(&buffer[0.._bytes_received], &server_address)
                     .await
                     .expect("Failed to send data to server");
                 shift_left(&mut buffer, _bytes_received);
-                let timeout_duration = Duration::from_secs(1);
+                let timeout_duration = Duration::from_secs(2);
                 match timeout(
                     timeout_duration,
                     middleware_socket.recv_from(&mut ack_buffer),
-                )
-                .await
+                ).await
                 {
                     Ok(Ok((ack_bytes_received, _server_address))) => {
                         middleware_socket
-                            .send_to(&ack_buffer, client_address)
+                            .send_to(&ack_buffer[0..ack_bytes_received], client_address)
                             .await
                             .expect("Failed to send acknowledgment to client");
                         shift_left(&mut ack_buffer, ack_bytes_received);
@@ -103,8 +107,10 @@ async fn middleware_task(middleware_socket: UdpSocket) {
                 }
             }
         } else {
+            println!("Server:{}",var);
+            let my_client_address="127.0.0.8:3411";
             middleware_socket
-                .send_to(&ack_buffer, client_address)
+                .send_to(&ack_buffer[0.._bytes_received], my_client_address)
                 .await
                 .expect("Failed to send acknowledgment to client");
             shift_left(&mut ack_buffer, _bytes_received);
@@ -160,7 +166,7 @@ async fn main() {
     let middleware_address: SocketAddr = "127.0.0.8:12345"
         .parse()
         .expect("Failed to parse middleware address");
-    let client_socket = UdpSocket::bind("127.0.0.8:0")
+    let client_socket = UdpSocket::bind("127.0.0.8:3411")
         .await
         .expect("Failed to bind client socket");
     //let client_socket_register = UdpSocket::bind("127.0.0.8:8090").await.expect("Failed to bind client socket");
@@ -192,7 +198,6 @@ async fn main() {
         // Notify other tasks waiting for the signal
         //let _ = tx.send(());
         *termination_clone.lock().unwrap() = 1;
-        tokio::time::sleep(Duration::from_secs(2)).await;
 
         // Exit the application
         std::process::exit(0);
@@ -217,6 +222,7 @@ async fn main() {
             for (index, piece) in image_data.chunks(MAX_CHUNCK).enumerate() {
                 let is_last_piece = index == packet_number;
                 let chunk = Chunk {
+                    total_packet_number: packet_number,
                     position: if is_last_piece {
                         -1
                     } else {
@@ -227,8 +233,8 @@ async fn main() {
                         packet_array[..piece.len()].copy_from_slice(piece);
                         packet_array
                     },
+                    
                 };
-
                 let serialized = serde_json::to_string(&chunk).unwrap();
 
                 client_socket
@@ -241,6 +247,8 @@ async fn main() {
                     .await
                     .expect("Failed to receive acknowledgement from server");
             }
+            println!("Finished All Packets");
+            println!("{}",packet_number);
 
             let mut encrypted_image_data: Vec<u8> = Vec::new();
             let mut image_chunks = HashMap::<i16, PacketArray>::new();
