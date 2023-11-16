@@ -1,13 +1,11 @@
 use async_std::net::UdpSocket;
-use image::{EncodableLayout, GenericImageView};
+use image::GenericImageView;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::net::SocketAddr;
-use steganography::decoder::Decoder;
+use steganography::decoder::*;
 use steganography::encoder::*;
-use steganography::util::{
-    bytes_to_str, file_as_dynamic_image, file_as_image_buffer, save_image_buffer,
-};
+use steganography::util::*;
 
 mod big_array;
 use big_array::BigArray;
@@ -99,7 +97,7 @@ async fn server1(server_address: &str, _middleware_address: &str) {
                 let (width, height) = image.dimensions();
                 println!("Image dimensions: {} x {}", width, height);
 
-                if let Err(err) = image.save("output_image.jpg") {
+                if let Err(err) = image.save("received_image.jpg") {
                     eprintln!("Failed to save the image: {}", err);
                 } else {
                     println!("Image saved successfully");
@@ -108,15 +106,31 @@ async fn server1(server_address: &str, _middleware_address: &str) {
                 println!("Failed to create image from byte stream");
             }
 
-            let encryptor = file_as_dynamic_image("encrypt.jpg".to_string());
-            let enc = Encoder::new(&image_data.as_bytes(), encryptor);
+            let message = "This is a steganography demo!".to_string();
+            let payload = str_to_bytes(&message);
+            let destination_image = file_as_dynamic_image("encrypt.jpg".to_string());
+            let enc = Encoder::new(payload, destination_image);
             let result = enc.encode_alpha();
             save_image_buffer(result, "encrypted.jpg".to_string());
+
+            let encoded_image = file_as_image_buffer("encrypted.jpg".to_string());
+            let dec = Decoder::new(encoded_image);
+            let out_buffer = dec.decode_alpha();
+            let clean_buffer: Vec<u8> = out_buffer.into_iter().filter(|b| *b != 0xff_u8).collect();
+            let message = bytes_to_str(clean_buffer.as_slice());
+
+            println!("{}", message);
+
+            // let encryptor = file_as_dynamic_image("encrypt.jpg".to_string());
+            // let enc = Encoder::new(&image_data, encryptor);
+            // let result = enc.encode_alpha();
+            // save_image_buffer(result, "encrypted.jpg".to_string());
 
             // let encoded_image = file_as_image_buffer("encrypted.jpg".to_string());
             // let dec = Decoder::new(encoded_image);
             // let out_buffer = dec.decode_alpha();
-            // let clean_buffer: Vec<u8> = out_buffer.into_iter().filter(|b| *b != 0xff_u8).collect();
+
+            // println!("{:?}", out_buffer);
 
             // if let Ok(decoded_image) = image::load_from_memory(&clean_buffer) {
             //     let (width, height) = decoded_image.dimensions();
@@ -154,14 +168,12 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
     //     .expect("Failed to bind server to server socket");
 
     println!("Server middleware is listening on {}", middleware_address);
-    let mut current_server: i32 = 0;
+    let mut _current_server: i32 = 0;
     let mut receive_buffer = [0; BUFFER_SIZE];
     let mut send_buffer = [0; BUFFER_SIZE]; // Separate buffer for sending data
     while let Ok((bytes_received, client_address)) =
         middleware_socket.recv_from(&mut receive_buffer).await
     {
-        println!("Middleware received packet");
-
         // server_to_server_socket
         //     .connect("127.0.0.3:8080")
         //     .await
@@ -214,12 +226,10 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
             .expect("Failed to send data to server");
         shift_left(&mut send_buffer, bytes_received);
 
-        let (ack_bytes_received, server_address) = server_socket
+        let (ack_bytes_received, _server_address) = server_socket
             .recv_from(&mut receive_buffer)
             .await
             .expect("Failed to receive acknowledgment from server");
-
-        println!("Server address {}", server_address);
 
         // Send the acknowledgment from the server to the client's middleware
         middleware_socket
