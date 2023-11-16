@@ -97,7 +97,7 @@ async fn server1(server_address: &str, _middleware_address: &str) {
                 let (width, height) = image.dimensions();
                 println!("Image dimensions: {} x {}", width, height);
 
-                if let Err(err) = image.save("received_image.jpg") {
+                if let Err(err) = image.save("received_image.png") {
                     eprintln!("Failed to save the image: {}", err);
                 } else {
                     println!("Image saved successfully");
@@ -108,12 +108,12 @@ async fn server1(server_address: &str, _middleware_address: &str) {
 
             let message = "This is a steganography demo!".to_string();
             let payload = str_to_bytes(&message);
-            let destination_image = file_as_dynamic_image("encrypt.jpg".to_string());
+            let destination_image = file_as_dynamic_image("encrypt.png".to_string());
             let enc = Encoder::new(payload, destination_image);
             let result = enc.encode_alpha();
-            save_image_buffer(result, "encrypted.jpg".to_string());
+            save_image_buffer(result, "encrypted.png".to_string());
 
-            let encoded_image = file_as_image_buffer("encrypted.jpg".to_string());
+            let encoded_image = file_as_image_buffer("encrypted.png".to_string());
             let dec = Decoder::new(encoded_image);
             let out_buffer = dec.decode_alpha();
             let clean_buffer: Vec<u8> = out_buffer.into_iter().filter(|b| *b != 0xff_u8).collect();

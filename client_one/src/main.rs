@@ -179,7 +179,7 @@ async fn main() {
             .expect("Failed to read line");
         if input.trim() == "" {
             println!("Sending Image");
-            let image_data = fs::read("image.jpg").expect("Failed to read the image file");
+            let image_data = fs::read("image.png").expect("Failed to read the image file");
             let middleware_address = "0.0.0.0:12345"; // Replace with the actual middleware address and port
                                                       //sleep(Duration::from_millis(5000)).await;
 
