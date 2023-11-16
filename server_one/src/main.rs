@@ -142,8 +142,8 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
     let mut num_down: i32 = 0;
     println!("Server middleware is listening on {}", middleware_address);
     let mut current_server: i32 = 0;
-    let mut receive_buffer = [0; 1024];
-    let mut send_buffer = [0; 1024]; // Separate buffer for sending data
+    let mut receive_buffer = [0; BUFFER_SIZE];
+    let mut send_buffer = [0; BUFFER_SIZE]; // Separate buffer for sending data
     let mut my_load = String::from(""); //New
     let mut _my_packets = 0; //New
     let mut current_packet = 0; //New
@@ -184,8 +184,8 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
         let mut server_to_server1_receive_buffer = [0; 4];
         let mut server_to_server2_receive_buffer = [0; 4];
         let mut just_up_receive_buffer = [0; 4];
-        let mut server1_load_receive_buffer = [0; 1024];
-        let mut server2_load_receive_buffer = [0; 1024];
+        let mut server1_load_receive_buffer = [0; BUFFER_SIZE];
+        let mut server2_load_receive_buffer = [0; BUFFER_SIZE];
         let mut packets_size_receive_buffer = [0; 4];
 
         //server_to_server_socket
@@ -463,8 +463,8 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                     println!("Current Server Down {}", current_server);
                     println!("I am here");
                     just_up_receive_buffer = [0; 4];
-                    //receive_buffer = [0; 1024];
-                    //receive_buffer = [0; 1024];
+                    //receive_buffer = [0; BUFFER_SIZE];
+                    //receive_buffer = [0; BUFFER_SIZE];
                     num_down += 1;
                     if (num_down > 1) {
                         //just_slept=just_slept+1;
@@ -532,8 +532,8 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                     println!("Current Server Down {}", current_server);
                     println!("I am here");
                     just_up_receive_buffer = [0; 4];
-                    //receive_buffer = [0; 1024];
-                    //receive_buffer = [0; 1024];
+                    //receive_buffer = [0; BUFFER_SIZE];
+                    //receive_buffer = [0; BUFFER_SIZE];
                     num_down += 1;
                     if (num_down > 1) {
                         //just_slept=just_slept+1;
@@ -662,7 +662,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
             // Clear the receive buffer for the next request
             server_to_server1_receive_buffer = [0; 4];
             server_to_server2_receive_buffer = [0; 4];
-            receive_buffer = [0; 1024];
+            receive_buffer = [0; BUFFER_SIZE];
             if (own_down == 1) {
                 tokio::time::sleep(Duration::from_secs(40)).await;
                 previous_down = 6;
@@ -705,8 +705,8 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                 println!("Current Server Down {}", current_server);
                 println!("I am here");
                 just_up_receive_buffer = [0; 4];
-                //receive_buffer = [0; 1024];
-                //receive_buffer = [0; 1024];
+                //receive_buffer = [0; BUFFER_SIZE];
+                //receive_buffer = [0; BUFFER_SIZE];
                 num_down += 1;
                 if (num_down > 1) {
                     //just_slept=just_slept+1;
