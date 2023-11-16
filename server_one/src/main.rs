@@ -93,53 +93,36 @@ async fn server1(server_address: &str, _middleware_address: &str) {
 
             remove_trailing_zeros(&mut image_data);
 
-            if let Ok(image) = image::load_from_memory(&image_data) {
-                let (width, height) = image.dimensions();
-                println!("Image dimensions: {} x {}", width, height);
-
-                if let Err(err) = image.save("received_image.png") {
-                    eprintln!("Failed to save the image: {}", err);
-                } else {
-                    println!("Image saved successfully");
-                }
-            } else {
-                println!("Failed to create image from byte stream");
-            }
-
-            let message = "This is a steganography demo!".to_string();
-            //Convert our string to bytes
-            let payload = str_to_bytes(&message);
-            //Load the image where we want to embed our secret message
-            let destination_image = file_as_dynamic_image("example.jpg".to_string());
-            //Create an encoder
+            let image_string = base64::encode(image_data.clone());
+            let payload = str_to_bytes(&image_string);
+            let destination_image = file_as_dynamic_image("encrypt.png".to_string());
             let enc = Encoder::new(payload, destination_image);
-            //Encode our message into the alpha channel of the image
-            let result = enc.encode_alpha();
-            //Save the new image
-            save_image_buffer(result, "hidden_message.png".to_string());
-
-            let encryptor = file_as_dynamic_image("encrypt.png".to_string());
-            let enc = Encoder::new(&image_data, encryptor);
             let result = enc.encode_alpha();
             save_image_buffer(result, "encrypted.png".to_string());
 
-            let encoded_image = file_as_image_buffer("encrypted.png".to_string());
-            let dec = Decoder::new(encoded_image);
-            let out_buffer = dec.decode_alpha();
-            let clean_buffer: Vec<u8> = out_buffer.into_iter().filter(|b| *b != 0xff_u8).collect();
+            // let encoded_image = file_as_image_buffer("encrypted.png".to_string());
+            // let dec = Decoder::new(encoded_image);
+            // let out_buffer = dec.decode_alpha();
+            // let clean_buffer: Vec<u8> = out_buffer.into_iter().filter(|b| *b != 0xff_u8).collect();
+            // let message = bytes_to_str(clean_buffer.as_slice());
 
-            if let Ok(decoded_image) = image::load_from_memory(&clean_buffer) {
-                let (width, height) = decoded_image.dimensions();
-                println!("Image dimensions: {} x {}", width, height);
+            // let decoded_image_data = base64::decode(message).unwrap_or_else(|e| {
+            //     eprintln!("Error decoding base64: {}", e);
+            //     Vec::new()
+            // });
 
-                if let Err(err) = decoded_image.save("decoded.png") {
-                    eprintln!("Failed to save the image: {}", err);
-                } else {
-                    println!("Image saved successfully");
-                }
-            } else {
-                println!("Failed to create image from byte stream");
-            }
+            // if let Ok(decoded_image) = image::load_from_memory(&decoded_image_data) {
+            //     let (width, height) = decoded_image.dimensions();
+            //     println!("Image dimensions: {} x {}", width, height);
+
+            //     if let Err(err) = decoded_image.save("decoded.png") {
+            //         eprintln!("Failed to save the image: {}", err);
+            //     } else {
+            //         println!("Image saved successfully");
+            //     }
+            // } else {
+            //     println!("Failed to create image from byte stream");
+            // }
         }
 
         socket
