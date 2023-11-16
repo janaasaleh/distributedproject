@@ -80,6 +80,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
     let mut send_buffer = [0; 1024]; // Separate buffer for sending data
     while let Ok((bytes_received, client_address)) = middleware_socket.recv_from(&mut receive_buffer).await
     {
+        let ip= client_address.ip();
         println!("Just Slept:{}",just_slept);
         //println!("{:?}",receive_buffer);
         if(just_slept==1)
@@ -129,7 +130,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
         //.connect("127.0.0.3:8080")
         //.await
         //.expect("Failed to connect to the server");
-        if random_number < 3 && server_down==0 && real_server_down==0 && previous_down==0{
+        if random_number < 0 && server_down==0 && real_server_down==0 && previous_down==0{
         server_down=0;
         own_down=1;
         server_to_server_socket

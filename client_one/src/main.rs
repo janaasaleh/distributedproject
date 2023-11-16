@@ -13,6 +13,10 @@ async fn middleware_task(mut middleware_socket: UdpSocket) {
     let mut buffer = [0; 1024];
     let mut ack_buffer = [0; 1024];
     //let middleware_address: SocketAddr = "127.0.0.8:12345".parse().expect("Failed to parse middleware address");
+   
+    // let vector = 0
+    let mut code_zero:String=String::new();
+    code_zero="AA".to_string();
 
     loop {
         if let Ok((_bytes_received, client_address)) =
@@ -20,7 +24,7 @@ async fn middleware_task(mut middleware_socket: UdpSocket) {
         {
             println!("Yo1");
             println!("Yo2");
-            let server_socket = UdpSocket::bind("127.0.0.8:4000")
+            let server_socket = UdpSocket::bind("127.0.0.8:0")
                 .await
                 .expect("Failed to bind server socket");
             for server_address in &server_addresses {
@@ -40,18 +44,27 @@ async fn middleware_task(mut middleware_socket: UdpSocket) {
             }
             let timeout_duration = Duration::from_secs(1);
 
+            let message = String::from_utf8_lossy(&buffer);
+
             match timeout(timeout_duration, server_socket.recv_from(&mut ack_buffer)).await {
                 Ok(Ok((ack_bytes_received, server_address))) => {
+                middleware_socket
+                .send_to(&ack_buffer, client_address)
+                .await
+                .expect("Failed to send acknowledgment to client");
                 }
                 Ok(Err(e)) => {
                 }
                 Err(_) => {
-                }
-            }
-            middleware_socket
-                .send_to(&ack_buffer, client_address)
+                code_zero = "".to_string();
+                middleware_socket
+                .send_to(code_zero.as_bytes(), client_address)
                 .await
                 .expect("Failed to send acknowledgment to client");
+                code_zero = "AA".to_string();
+                }
+            }
+
             //println!("Yo6");
 
             // Sleep to give time for the server to send the acknowledgment
@@ -135,31 +148,63 @@ async fn main() {
         // For demonstration purposes, a message is sent when 'Enter' key is pressed
         println!("Press Enter to send a Request");
         let mut input = String::new();
+        let mut image_data:Vec<String>=Vec::new();
         std::io::stdin().read_line(&mut input).expect("Failed to read line");
         if input.trim() == "" {
-            for i in 1..10000
-            {
+            let mut i=1;
+        while i<100
+        {
             if(i%90==0)
             {
                 sleep(Duration::from_millis(10)).await;
             }
+            let mut send_message= format!("{};{}",i,100);
+           
+
+           
             let client_message = "Request from Client 1!";
             let middleware_address = "127.0.0.8:12345"; // Replace with the actual middleware address and port
            //sleep(Duration::from_millis(5000)).await;
             client_socket
-            .send_to(client_message.as_bytes(), middleware_address)
+            .send_to(&send_message.as_bytes(), middleware_address)
             .await
             .expect("Failed to send request to middleware");
    
             // Receive response from the server (the first one)
             let mut client_buffer = [0; 1024];
+            if(i==99)
+            {
+            for j in 1..99
+            {
+            client_socket
+            .recv_from(&mut client_buffer)
+            .await
+            .expect("Failed to receive response from server");
+            let response= String::from_utf8_lossy(&client_buffer);
+            image_data.push(response.to_string());
+            // Form Image
+            println!("Image formed");
+            image_data.clear();
+            i=i+1;
+            }
+            }
+            else 
+            {
             client_socket
             .recv_from(&mut client_buffer)
             .await
             .expect("Failed to receive response from server");
             let response = String::from_utf8_lossy(&client_buffer);
+            if(response=="".to_string())
+            {
+                i=i-1;
+            }
+            else {
+                i=i+1;
+            }
             println!("Client received response from server: {}", response);
             }
+        }
         }
         if input.trim() == "Q"
         {
@@ -176,4 +221,3 @@ async fn main() {
 
     //middleware_task_handle.await.expect("Middleware task failed");
 }
-

@@ -2,6 +2,7 @@ use async_std::net::UdpSocket;
 use std::net::SocketAddr;
 use std::time::Duration;
 use rand::Rng;
+use std::net::IpAddr;
 
 async fn server3(server_address: &str, _middleware_address: &str) {
     let parts: Vec<&str> = server_address.split(':').collect();
@@ -18,8 +19,12 @@ async fn server3(server_address: &str, _middleware_address: &str) {
     println!("Server 1 socket is listening on {}", server_address);
 
     let mut buffer = [0; 1024];
+    // Make Vector
 
     while let Ok((_bytes_received, client_address)) = socket.recv_from(&mut buffer).await {
+        // If vector empty push
+        // else if vector size + 1 == packets size in chunck send to middleware(for loop),
+        // after sending to mw, empty the vector
         let message = String::from_utf8_lossy(&buffer);
         println!("Server 1 received: {}", message);
 
@@ -57,6 +62,12 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
     let skip_socket = UdpSocket::bind("127.0.0.2:8088")
         .await
         .expect("Failed to bind server to server socket");
+    let server_load_socket = UdpSocket::bind("127.0.0.2:8100")
+        .await
+        .expect("Failed to bind server to server socket");
+    let packets_size_socket = UdpSocket::bind("127.0.0.2:8101")
+        .await
+        .expect("Failed to bind server to server socket");
 
     let mut server_down=0;
     let real_server_down=0;
@@ -73,9 +84,16 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
     let mut current_server:i32 = 0;
     let mut receive_buffer = [0; 1024];
     let mut send_buffer = [0; 1024]; // Separate buffer for sending data
+    let mut my_load=String::from("");  //New
+    let mut _my_packets=0;  //New
+    let mut current_packet=0;  //New
+   
     while let Ok((bytes_received, client_address)) =
         middleware_socket.recv_from(&mut receive_buffer).await
     {
+        let ip= client_address.ip();       //New
+        let ip_string = ip.to_string();        // New
+         
         println!("Just Slept:{}",just_slept);
         if(just_slept==1)
         {
@@ -106,10 +124,16 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
         let index: &[u8] = &current_server.to_be_bytes();
         let down_index: &[u8] = &server_down_index.to_be_bytes();
         let up_index: &[u8] = &server_up_index.to_be_bytes();
+        //let mut otherload1;
+        //let mut otherload2;
+       
 
         let mut server_to_server1_receive_buffer = [0; 4];
         let mut server_to_server2_receive_buffer = [0; 4];
         let mut just_up_receive_buffer = [0; 4];
+        let mut server1_load_receive_buffer = [0; 1024];
+        let mut server2_load_receive_buffer = [0; 1024];
+        let mut packets_size_receive_buffer = [0; 4];
 
 
         //server_to_server_socket
@@ -121,7 +145,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
         //.connect("127.0.0.4:8080")
         //.await
         //.expect("Failed to connect to the server");
-        if random_number < 1 && server_down==0 && real_server_down==0 && previous_down==0{
+        if random_number < 0 && server_down==0 && real_server_down==0 && previous_down==0 && my_load==""{
         server_down=0;
         own_down=1;
         server_to_server_socket
@@ -130,6 +154,14 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
             .expect("Failed to send index to server 2");
         server_to_server_socket
             .send_to(down_index, "127.0.0.4:8080")
+            .await
+            .expect("Failed to send index to server 3");
+        server_load_socket
+            .send_to(my_load.as_bytes(), "127.0.0.4:8100")
+            .await
+            .expect("Failed to send index to server 3");
+        server_load_socket
+            .send_to(my_load.as_bytes(), "127.0.0.4:8100")
             .await
             .expect("Failed to send index to server 3");
         println!("Server 1 going down!");
@@ -145,11 +177,23 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
             .send_to(index, "127.0.0.4:8080")
             .await
             .expect("Failed to send index to server 3");
+            server_load_socket
+            .send_to(my_load.as_bytes(), "127.0.0.4:8100")
+            .await
+            .expect("Failed to send index to server 3");
+            server_load_socket
+            .send_to(my_load.as_bytes(), "127.0.0.4:8100")
+            .await
+            .expect("Failed to send index to server 3");
             }
             else if which_server==1
             {
                 server_to_server_socket
             .send_to(index, "127.0.0.4:8080")
+            .await
+            .expect("Failed to send index to server 3");
+            server_load_socket
+            .send_to(my_load.as_bytes(), "127.0.0.4:8100")
             .await
             .expect("Failed to send index to server 3");
             }
@@ -159,15 +203,23 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
             .send_to(index, "127.0.0.3:8080")
             .await
             .expect("Failed to send index to server 2");
+            server_load_socket
+            .send_to(my_load.as_bytes(), "127.0.0.4:8100")
+            .await
+            .expect("Failed to send index to server 3");
             }
         }
 
 
+        server_load_socket
+            .recv_from(&mut server1_load_receive_buffer)
+            .await
+            .expect("Couldn't recieve index");
         server_to_server_socket
             .recv_from(&mut server_to_server1_receive_buffer)
             .await
             .expect("Couldn't recieve index");
-
+       
         let mut index1 = i32::from_be_bytes([
             server_to_server1_receive_buffer[0],
             server_to_server1_receive_buffer[1],
@@ -175,10 +227,17 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
             server_to_server1_receive_buffer[3],
         ]);
 
+       
+        let otherload1 = &String::from_utf8_lossy(&server1_load_receive_buffer).to_string();
+
         if(server_down==0 || index1>19)
         {
         server_to_server_socket
             .recv_from(&mut server_to_server2_receive_buffer)
+            .await
+            .expect("Couldn't recieve index");
+        server_load_socket
+            .recv_from(&mut server2_load_receive_buffer)
             .await
             .expect("Couldn't recieve index");
         }
@@ -189,6 +248,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
             server_to_server2_receive_buffer[2],
             server_to_server2_receive_buffer[3],
         ]);
+        let otherload2 = &String::from_utf8_lossy(&server2_load_receive_buffer);
 
         println!("Index recieved {}", index1);
         println!("Index recieved {}", index2);
@@ -308,6 +368,28 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
             .await.expect("Failed to send index to server 3");
             just_up=0;
             }
+            if(ip_string==my_load)
+            {
+            }
+            else if my_load=="" && &ip_string!=otherload1 && &ip_string!=otherload2
+            {
+                let ip_strings: String = ip.to_string();
+                my_load=ip_strings;
+                packets_size_socket
+                .recv_from(&mut packets_size_receive_buffer)
+                .await
+                .expect("Couldn't recieve index");
+                // _my_packets = i32::from_be_bytes([
+                //packets_size_receive_buffer[0],
+                //packets_size_receive_buffer[1],
+                //packets_size_receive_buffer[2],
+                //packets_size_receive_buffer[3],
+            //]);
+            }
+            else {
+                continue;
+            }
+           
         } else if current_server == 1 {
             current_server += 1;
             if(just_up==1)
@@ -375,7 +457,12 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                 just_slept=just_slept;
             }
             }
+            if(ip_string==my_load)
+            {
+            }
+            else {
             continue;
+            }
         } else if current_server == 2{
             current_server = 0;
             if(just_up==1)
@@ -443,7 +530,12 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                     just_slept=just_slept;
                 }
             }
+            if(ip_string==my_load)
+            {
+            }
+            else {
             continue;
+            }
         }
     }
     else if (which_server==1)
@@ -451,25 +543,87 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
 
         if current_server == 0{
             current_server += 2;
+            if(ip_string==my_load)
+            {
+            }
+            else if my_load=="" && &ip_string!=otherload1 && &ip_string!=otherload2
+            {
+                let ip_strings: String = ip.to_string();
+                my_load=ip_strings;
+                //packets_size_socket
+                //.recv_from(&mut packets_size_receive_buffer)
+                //.await
+                //.expect("Couldn't recieve index");
+                //_my_packets = i32::from_be_bytes([
+                //packets_size_receive_buffer[0],
+                //packets_size_receive_buffer[1],
+                //packets_size_receive_buffer[2],
+                //packets_size_receive_buffer[3],
+            //]);
+            }
+            else {
+                continue;
+            }
 
         } else if current_server == 1 {
             current_server += 1;
+            if(ip_string==my_load)
+            {
+            }
+            else {
             continue;
+            }
         } else if current_server == 2 {
             current_server = 0;
+            if(ip_string==my_load)
+            {
+            }
+            else {
             continue;
+            }
         }
     }
     else if (which_server==2)
     {
         if current_server == 0 {
             current_server += 1;
+            if(ip_string==my_load)
+            {
+            }
+            else if my_load=="" && &ip_string!=otherload1 && &ip_string!=otherload2
+            {
+                let ip_strings: String = ip.to_string();
+                my_load=ip_strings;
+               //packets_size_socket
+               //.recv_from(&mut packets_size_receive_buffer)
+               //.await
+               //.expect("Couldn't recieve index");
+               //_my_packets = i32::from_be_bytes([
+               //packets_size_receive_buffer[0],
+               //packets_size_receive_buffer[1],
+               //packets_size_receive_buffer[2],
+               //packets_size_receive_buffer[3],
+            //]);
+            }
+            else {
+                continue;
+            }
         } else if current_server == 1{
             current_server = 0;
+            if(ip_string==my_load)
+            {
+            }
+            else {
             continue;
+            }
         } else if current_server == 2 {
             current_server = 0;
+            if(ip_string==my_load)
+            {
+            }
+            else {
             continue;
+            }
         }
     }
     else {
@@ -498,7 +652,10 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
             .await
             .expect("Failed to send data to server");
         println!("Entered Here 2");
-
+        if(current_packet==_my_packets)
+        {
+        for i in 1.._my_packets
+        {
         let (ack_bytes_received, server_caddress) = server_socket
             .recv_from(&mut receive_buffer)
             .await
@@ -513,6 +670,13 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
             .expect("Failed to send acknowledgment to client");
         println!("Entered Here 4");
         println!("Client Address:{}",client_address);
+        }
+        }
+        else
+        {
+           
+        }
+        current_packet+=1;
 
         // Clear the receive buffer for the next request
         server_to_server1_receive_buffer = [0; 4];
