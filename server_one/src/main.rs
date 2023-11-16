@@ -98,32 +98,6 @@ async fn server1(server_address: &str, _middleware_address: &str) {
             let enc = Encoder::new(payload, destination_image);
             let result = enc.encode_alpha();
             save_image_buffer(result, "encrypted.png".to_string());
-
-            
-
-            // let encoded_image = file_as_image_buffer("encrypted.png".to_string());
-            // let dec = Decoder::new(encoded_image);
-            // let out_buffer = dec.decode_alpha();
-            // let clean_buffer: Vec<u8> = out_buffer.into_iter().filter(|b| *b != 0xff_u8).collect();
-            // let message = bytes_to_str(clean_buffer.as_slice());
-
-            // let decoded_image_data = base64::decode(message).unwrap_or_else(|e| {
-            //     eprintln!("Error decoding base64: {}", e);
-            //     Vec::new()
-            // });
-
-            // if let Ok(decoded_image) = image::load_from_memory(&decoded_image_data) {
-            //     let (width, height) = decoded_image.dimensions();
-            //     println!("Image dimensions: {} x {}", width, height);
-
-            //     if let Err(err) = decoded_image.save("decoded.png") {
-            //         eprintln!("Failed to save the image: {}", err);
-            //     } else {
-            //         println!("Image saved successfully");
-            //     }
-            // } else {
-            //     println!("Failed to create image from byte stream");
-            // }
         }
         socket
             .send_to(
@@ -133,8 +107,6 @@ async fn server1(server_address: &str, _middleware_address: &str) {
             .await
             .expect("Couldnt send to middleware");
     }
-
-    // let _ = fs::write("image.png", &image_data);
 }
 
 async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>) {
