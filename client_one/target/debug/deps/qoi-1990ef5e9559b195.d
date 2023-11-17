@@ -1,0 +1,13 @@
+/mnt/Doma/AUC/Distributed systems/project/distributedproject/client_one/target/debug/deps/qoi-1990ef5e9559b195.rmeta: /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/qoi-0.4.1/src/lib.rs /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/qoi-0.4.1/src/decode.rs /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/qoi-0.4.1/src/encode.rs /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/qoi-0.4.1/src/error.rs /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/qoi-0.4.1/src/header.rs /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/qoi-0.4.1/src/pixel.rs /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/qoi-0.4.1/src/types.rs /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/qoi-0.4.1/src/utils.rs /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/qoi-0.4.1/src/consts.rs
+
+/mnt/Doma/AUC/Distributed systems/project/distributedproject/client_one/target/debug/deps/qoi-1990ef5e9559b195.d: /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/qoi-0.4.1/src/lib.rs /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/qoi-0.4.1/src/decode.rs /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/qoi-0.4.1/src/encode.rs /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/qoi-0.4.1/src/error.rs /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/qoi-0.4.1/src/header.rs /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/qoi-0.4.1/src/pixel.rs /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/qoi-0.4.1/src/types.rs /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/qoi-0.4.1/src/utils.rs /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/qoi-0.4.1/src/consts.rs
+
+/home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/qoi-0.4.1/src/lib.rs:
+/home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/qoi-0.4.1/src/decode.rs:
+/home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/qoi-0.4.1/src/encode.rs:
+/home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/qoi-0.4.1/src/error.rs:
+/home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/qoi-0.4.1/src/header.rs:
+/home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/qoi-0.4.1/src/pixel.rs:
+/home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/qoi-0.4.1/src/types.rs:
+/home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/qoi-0.4.1/src/utils.rs:
+/home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/qoi-0.4.1/src/consts.rs:

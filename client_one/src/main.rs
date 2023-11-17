@@ -63,13 +63,13 @@ async fn middleware_task(middleware_socket: UdpSocket) {
     // let vector = 0
     // let mut code_zero: String = String::new();
     // code_zero = "AA".to_string();
-    let mut var=0;
+    let mut var = 0;
 
     while let Ok((_bytes_received, client_address)) = middleware_socket.recv_from(&mut buffer).await
     {
-        var+=1;
+        var += 1;
         if client_address.ip().to_string() == "127.0.0.8" {
-            println!("Client:{}",var);
+            println!("Client:{}", var);
             let _server_socket = UdpSocket::bind("127.0.0.8:0")
                 .await
                 .expect("Failed to bind server socket");
@@ -86,7 +86,8 @@ async fn middleware_task(middleware_socket: UdpSocket) {
                 match timeout(
                     timeout_duration,
                     middleware_socket.recv_from(&mut ack_buffer),
-                ).await
+                )
+                .await
                 {
                     Ok(Ok((ack_bytes_received, _server_address))) => {
                         middleware_socket
@@ -107,10 +108,14 @@ async fn middleware_task(middleware_socket: UdpSocket) {
                 }
             }
         } else {
-            println!("Server:{}",var);
-            let my_client_address="127.0.0.8:3411";
+            println!("Server:{}", var);
+            let my_client_address = "127.0.0.8:3411";
             middleware_socket
-                .send_to(&ack_buffer[0.._bytes_received], my_client_address)
+                .send_to(&buffer[0.._bytes_received], my_client_address)
+                .await
+                .expect("Failed to send acknowledgment to client");
+            middleware_socket
+                .send_to(&buffer[0.._bytes_received], client_address)
                 .await
                 .expect("Failed to send acknowledgment to client");
             shift_left(&mut ack_buffer, _bytes_received);
@@ -233,7 +238,6 @@ async fn main() {
                         packet_array[..piece.len()].copy_from_slice(piece);
                         packet_array
                     },
-                    
                 };
                 let serialized = serde_json::to_string(&chunk).unwrap();
 
@@ -248,25 +252,33 @@ async fn main() {
                     .expect("Failed to receive acknowledgement from server");
             }
             println!("Finished All Packets");
-            println!("{}",packet_number);
+            println!("{}", packet_number);
 
             let mut encrypted_image_data: Vec<u8> = Vec::new();
             let mut image_chunks = HashMap::<i16, PacketArray>::new();
+            let mut j = 0;
+            let mut enecrypted_image_packet_number = packet_number;
 
-            for j in 0..packet_number {
+            while j < enecrypted_image_packet_number {
                 if let Ok((_bytes_received, _client_address)) =
                     client_socket.recv_from(&mut client_buffer).await
                 {
                     let packet_string = String::from_utf8_lossy(&client_buffer[0.._bytes_received]);
                     let deserialized: Chunk = serde_json::from_str(&packet_string).unwrap();
+                    enecrypted_image_packet_number = deserialized.total_packet_number;
                     shift_left(&mut client_buffer, _bytes_received);
-                    if j == packet_number {
-                        image_chunks.insert(packet_number.try_into().unwrap(), deserialized.packet);
+                    if j == enecrypted_image_packet_number - 1 {
+                        image_chunks.insert(
+                            enecrypted_image_packet_number.try_into().unwrap(),
+                            deserialized.packet,
+                        );
                     } else {
                         image_chunks.insert(deserialized.position, deserialized.packet);
                     }
+                    j += 1;
                 }
             }
+            println!("Ana 5aragt");
             let image_chunks_cloned: BTreeMap<_, _> = image_chunks.clone().into_iter().collect();
 
             for (_key, value) in image_chunks_cloned {
@@ -275,6 +287,7 @@ async fn main() {
             }
 
             remove_trailing_zeros(&mut encrypted_image_data);
+            println!("EID Size {}", encrypted_image_data.len());
 
             if let Ok(encrypted_image) = image::load_from_memory(&encrypted_image_data) {
                 let (width, height) = encrypted_image.dimensions();
