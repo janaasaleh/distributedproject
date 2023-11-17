@@ -78,12 +78,12 @@ async fn server1(server_address: &str, _middleware_address: &str) {
             image_chunks.insert(deserialized.position, deserialized.packet);
             packet_number += 1;
             socket
-                .send_to(
-                    "Sent acknowledgement to middleware".as_bytes(),
-                    _client_address,
-                )
-                .await
-                .expect("Couldnt send to middleware");
+            .send_to(
+                "Sent acknowledgement to middleware".as_bytes(),
+                _client_address,
+            )
+            .await
+            .expect("Couldnt send to middleware");
         } else {
             println!("Entered in Server Encryption");
             image_chunks.insert(packet_number, deserialized.packet);
@@ -109,11 +109,11 @@ async fn server1(server_address: &str, _middleware_address: &str) {
             image_data.clear();
             image_data = fs::read("encrypted.png").expect("Failed to read the image file");
 
-            let packet_number = image_data.len() / MAX_CHUNCK;
-            //println!("{}",packet_number);
+            let packet_number = (image_data.len() / MAX_CHUNCK)+1;
+            println!("{}",packet_number);
 
             for (index, piece) in image_data.chunks(MAX_CHUNCK).enumerate() {
-                let is_last_piece = index == packet_number;
+                let is_last_piece = index == packet_number-1;
                 let chunk = Chunk {
                     total_packet_number: packet_number,
                     position: if is_last_piece {
@@ -235,7 +235,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
             && real_server_down == 0
             && previous_down == 0
             && my_load == ""
-            && current_server != 0
+            && current_server!=0
         {
             server_down = 0;
             own_down = 1;
@@ -697,11 +697,12 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
 
         println!("Entered Here 2");
         println!("{}", current_packet);
+        current_packet += 1;
         if current_packet == _my_packets {
             println!("Entered MAX Packet size");
-            let mut i = 0;
-            let mut encrypted_image_packets = _my_packets;
-            while i < encrypted_image_packets + 1 {
+            let mut i=0;
+            let mut encrypted_image_packets=_my_packets;
+            while i<encrypted_image_packets {
                 println!("Just chill");
                 let (ack_bytes_received, server_caddress) = server_socket
                     .recv_from(&mut receive_buffer)
@@ -709,7 +710,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                     .expect("Failed to receive acknowledgment from server");
                 let packet_string = String::from_utf8_lossy(&receive_buffer[0..ack_bytes_received]);
                 let deserialized: Chunk = serde_json::from_str(&packet_string).unwrap();
-                encrypted_image_packets = deserialized.total_packet_number;
+                encrypted_image_packets=deserialized.total_packet_number;
                 println!("Entered Here 3");
                 //println!("Server address {}", server_caddress);
 
@@ -732,13 +733,14 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                     .expect("Failed to send acknowledgment to client");
                 println!("Entered Here 4");
                 println!("Client Address:{}", client_address);
-                i += 1;
+                i+=1;
+                println!("Index {}",i);
             }
             println!("Just chill bara");
             current_packet = 0;
             my_load = "".to_string();
         } else {
-            current_packet += 1;
+           
             let (ack_bytes_received, server_caddress) = server_socket
                 .recv_from(&mut receive_buffer)
                 .await
@@ -824,3 +826,4 @@ async fn main() {
 
     let _ = tokio::join!(server1_task, server_middleware_task);
 }
+
