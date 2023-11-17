@@ -1,1 +1,1 @@
-/home/mahfouz/DS/distributedproject/client_two/target/debug/client_two: /home/mahfouz/DS/distributedproject/client_two/src/main.rs
+/mnt/Doma/AUC/Distributed\ systems/project/distributedproject/client_two/target/debug/client_two: /mnt/Doma/AUC/Distributed\ systems/project/distributedproject/client_two/src/big_array.rs /mnt/Doma/AUC/Distributed\ systems/project/distributedproject/client_two/src/main.rs

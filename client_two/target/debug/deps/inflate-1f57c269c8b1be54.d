@@ -1,0 +1,11 @@
+/mnt/Doma/AUC/Distributed systems/project/distributedproject/client_two/target/debug/deps/inflate-1f57c269c8b1be54.rmeta: /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/inflate-0.4.5/src/lib.rs /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/inflate-0.4.5/src/checksum.rs /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/inflate-0.4.5/src/writer.rs /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/inflate-0.4.5/src/utils.rs /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/inflate-0.4.5/src/reader.rs
+
+/mnt/Doma/AUC/Distributed systems/project/distributedproject/client_two/target/debug/deps/libinflate-1f57c269c8b1be54.rlib: /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/inflate-0.4.5/src/lib.rs /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/inflate-0.4.5/src/checksum.rs /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/inflate-0.4.5/src/writer.rs /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/inflate-0.4.5/src/utils.rs /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/inflate-0.4.5/src/reader.rs
+
+/mnt/Doma/AUC/Distributed systems/project/distributedproject/client_two/target/debug/deps/inflate-1f57c269c8b1be54.d: /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/inflate-0.4.5/src/lib.rs /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/inflate-0.4.5/src/checksum.rs /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/inflate-0.4.5/src/writer.rs /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/inflate-0.4.5/src/utils.rs /home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/inflate-0.4.5/src/reader.rs
+
+/home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/inflate-0.4.5/src/lib.rs:
+/home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/inflate-0.4.5/src/checksum.rs:
+/home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/inflate-0.4.5/src/writer.rs:
+/home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/inflate-0.4.5/src/utils.rs:
+/home/adham/.cargo/registry/src/index.crates.io-6f17d22bba15001f/inflate-0.4.5/src/reader.rs:

@@ -78,12 +78,12 @@ async fn server1(server_address: &str, _middleware_address: &str) {
             image_chunks.insert(deserialized.position, deserialized.packet);
             packet_number += 1;
             socket
-                .send_to(
-                    "Sent acknowledgement to middleware".as_bytes(),
-                    _client_address,
-                )
-                .await
-                .expect("Couldnt send to middleware");
+            .send_to(
+                "Sent acknowledgement to middleware".as_bytes(),
+                _client_address,
+            )
+            .await
+            .expect("Couldnt send to middleware");
         } else {
             println!("Entered in Server Encryption");
             image_chunks.insert(packet_number, deserialized.packet);
@@ -109,11 +109,11 @@ async fn server1(server_address: &str, _middleware_address: &str) {
             image_data.clear();
             image_data = fs::read("encrypted.png").expect("Failed to read the image file");
 
-            let packet_number = (image_data.len() / MAX_CHUNCK) + 1;
-            println!("{}", packet_number);
+            let packet_number = (image_data.len() / MAX_CHUNCK)+1;
+            println!("{}",packet_number);
 
             for (index, piece) in image_data.chunks(MAX_CHUNCK).enumerate() {
-                let is_last_piece = index == packet_number - 1;
+                let is_last_piece = index == packet_number-1;
                 let chunk = Chunk {
                     total_packet_number: packet_number,
                     position: if is_last_piece {
@@ -142,7 +142,6 @@ async fn server1(server_address: &str, _middleware_address: &str) {
                     .expect("Failed to receive acknowledgement from server");
                 println!("Server received ack packet {}", index);
             }
-            image_data.clear();
         }
     }
 }
@@ -188,6 +187,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
     {
         let ip = client_address.ip(); //New
         let ip_string = ip.to_string(); // New
+        println!("My Load {}",my_load);
 
         println!("Just Slept:{}", just_slept);
         if just_slept == 1 {
@@ -236,7 +236,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
             && real_server_down == 0
             && previous_down == 0
             && my_load == ""
-            && current_server != 0
+            && current_server!=0
         {
             server_down = 0;
             own_down = 1;
@@ -249,7 +249,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                 .await
                 .expect("Failed to send index to server 3");
             server_load_socket
-                .send_to(my_load.as_bytes(), "127.0.0.4:8100")
+                .send_to(my_load.as_bytes(), "127.0.0.3:8100")
                 .await
                 .expect("Failed to send index to server 3");
             server_load_socket
@@ -268,7 +268,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                     .await
                     .expect("Failed to send index to server 3");
                 server_load_socket
-                    .send_to(my_load.as_bytes(), "127.0.0.4:8100")
+                    .send_to(my_load.as_bytes(), "127.0.0.3:8100")
                     .await
                     .expect("Failed to send index to server 3");
                 server_load_socket
@@ -290,21 +290,20 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                     .await
                     .expect("Failed to send index to server 2");
                 server_load_socket
-                    .send_to(my_load.as_bytes(), "127.0.0.4:8100")
+                    .send_to(my_load.as_bytes(), "127.0.0.3:8100")
                     .await
                     .expect("Failed to send index to server 3");
             }
         }
 
-        //server_load_socket
-        //    .recv_from(&mut server1_load_receive_buffer)
-        //    .await
-        //    .expect("Couldn't recieve index");
-        //server_to_server_socket
-        //    .recv_from(&mut server_to_server1_receive_buffer)
-        //    .await
-        //    .expect("Couldn't recieve index");
-
+        let(ll_bytes,_)=server_load_socket
+        .recv_from(&mut server1_load_receive_buffer)
+        .await
+        .expect("Couldn't recieve index");
+        server_to_server_socket
+            .recv_from(&mut server_to_server1_receive_buffer)
+            .await
+            .expect("Couldn't recieve index");
         let mut index1 = i32::from_be_bytes([
             server_to_server1_receive_buffer[0],
             server_to_server1_receive_buffer[1],
@@ -312,18 +311,21 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
             server_to_server1_receive_buffer[3],
         ]);
 
-        let otherload1 = &String::from_utf8_lossy(&server1_load_receive_buffer).to_string();
+        let mut otherload1 = String::from_utf8_lossy(&server1_load_receive_buffer[0..ll_bytes]).to_string();
+        let mut ss_bytes=0;
 
-        // if server_down == 0 || index1 > 19 {
-        //    server_to_server_socket
-        //        .recv_from(&mut server_to_server2_receive_buffer)
-        //        .await
-        //        .expect("Couldn't recieve index");
-        //    server_load_socket
-        //        .recv_from(&mut server2_load_receive_buffer)
-        //        .await
-        //        .expect("Couldn't recieve index");
-        // }
+        if(server_down==0 || index1>19)
+        {
+        server_to_server_socket
+            .recv_from(&mut server_to_server2_receive_buffer)
+            .await
+            .expect("Couldn't recieve index");
+        let (ss_rrr,_)=server_load_socket
+                .recv_from(&mut server2_load_receive_buffer)
+                .await
+                .expect("Couldn't recieve index");
+        ss_bytes=ss_rrr;
+        }
 
         let mut index2 = i32::from_be_bytes([
             server_to_server2_receive_buffer[0],
@@ -331,7 +333,9 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
             server_to_server2_receive_buffer[2],
             server_to_server2_receive_buffer[3],
         ]);
-        let otherload2 = &String::from_utf8_lossy(&server2_load_receive_buffer);
+
+
+        let mut otherload2 = String::from_utf8_lossy(&server2_load_receive_buffer[0..ss_bytes]).to_string();
 
         println!("Index recieved {}", index1);
         println!("Index recieved {}", index2);
@@ -425,7 +429,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                     just_up = 0;
                 }
                 if ip_string == my_load {
-                } else if my_load == "" && &ip_string != otherload1 && &ip_string != otherload2 {
+                } else if my_load == "" && ip_string != otherload1 && ip_string != otherload2 {
                     let ip_strings: String = ip.to_string();
                     my_load = ip_strings;
                     let packet_string = String::from_utf8_lossy(&receive_buffer[0..bytes_received]);
@@ -589,7 +593,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
             if current_server == 0 {
                 current_server += 2;
                 if ip_string == my_load {
-                } else if my_load == "" && &ip_string != otherload1 && &ip_string != otherload2 {
+                } else if my_load == "" && ip_string != otherload1 && ip_string != otherload2 {
                     let ip_strings: String = ip.to_string();
                     my_load = ip_strings;
                     let packet_string = String::from_utf8_lossy(&receive_buffer[0..bytes_received]);
@@ -626,7 +630,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
             if current_server == 0 {
                 current_server += 1;
                 if ip_string == my_load {
-                } else if my_load == "" && &ip_string != otherload1 && &ip_string != otherload2 {
+                } else if my_load == "" && ip_string != otherload1 && ip_string != otherload2 {
                     let ip_strings: String = ip.to_string();
                     my_load = ip_strings;
                     let packet_string = String::from_utf8_lossy(&receive_buffer[0..bytes_received]);
@@ -698,12 +702,15 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
 
         println!("Entered Here 2");
         println!("{}", current_packet);
+        let packet_string = String::from_utf8_lossy(&receive_buffer[0..bytes_received]);
+        let deserializeds: Chunk = serde_json::from_str(&packet_string).unwrap();
+        println!("{}",deserializeds.position);
         current_packet += 1;
         if current_packet == _my_packets {
             println!("Entered MAX Packet size");
-            let mut i = 0;
-            let mut encrypted_image_packets = _my_packets;
-            while i < encrypted_image_packets {
+            let mut i=0;
+            let mut encrypted_image_packets=_my_packets;
+            while i<encrypted_image_packets {
                 println!("Just chill");
                 let (ack_bytes_received, server_caddress) = server_socket
                     .recv_from(&mut receive_buffer)
@@ -711,7 +718,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                     .expect("Failed to receive acknowledgment from server");
                 let packet_string = String::from_utf8_lossy(&receive_buffer[0..ack_bytes_received]);
                 let deserialized: Chunk = serde_json::from_str(&packet_string).unwrap();
-                encrypted_image_packets = deserialized.total_packet_number;
+                encrypted_image_packets=deserialized.total_packet_number;
                 println!("Entered Here 3");
                 //println!("Server address {}", server_caddress);
 
@@ -734,13 +741,14 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                     .expect("Failed to send acknowledgment to client");
                 println!("Entered Here 4");
                 println!("Client Address:{}", client_address);
-                i += 1;
-                println!("Index {}", i);
+                i+=1;
+                println!("Index {}",i);
             }
             println!("Just chill bara");
             current_packet = 0;
             my_load = "".to_string();
         } else {
+           
             let (ack_bytes_received, server_caddress) = server_socket
                 .recv_from(&mut receive_buffer)
                 .await
@@ -826,3 +834,5 @@ async fn main() {
 
     let _ = tokio::join!(server1_task, server_middleware_task);
 }
+
+	
