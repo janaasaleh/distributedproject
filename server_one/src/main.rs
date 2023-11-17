@@ -142,6 +142,7 @@ async fn server1(server_address: &str, _middleware_address: &str) {
                     .expect("Failed to receive acknowledgement from server");
                 println!("Server received ack packet {}", index);
             }
+            image_data.clear();
         }
     }
 }
