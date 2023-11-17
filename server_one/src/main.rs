@@ -1,593 +1,349 @@
 use async_std::net::UdpSocket;
+use image::GenericImageView;
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, HashMap};
+use std::fs;
 use std::net::SocketAddr;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use rand::Rng;
+use steganography::decoder::*;
+use steganography::util::*;
+use tokio::signal::unix::{signal, SignalKind};
+use tokio::time::{sleep, timeout};
 
-async fn server3(server_address: &str, _middleware_address: &str) {
-    let parts: Vec<&str> = server_address.split(':').collect();
-    let port = parts[1]
-        .parse::<u16>()
-        .expect("Failed to parse port as u16");
-    let server_address: SocketAddr = server_address
-        .parse()
-        .expect("Failed to parse server address");
+mod big_array;
+use big_array::BigArray;
 
-    let socket = UdpSocket::bind(&server_address)
-        .await
-        .expect("Failed to bind server socket");
-    println!("Server 1 socket is listening on {}", server_address);
+const BUFFER_SIZE: usize = 65536;
+const MAX_CHUNCK: usize = 16384;
 
-    let mut buffer = [0; 1024];
+type PacketArray = [u8; MAX_CHUNCK];
 
-    while let Ok((_bytes_received, client_address)) = socket.recv_from(&mut buffer).await {
-        let message = String::from_utf8_lossy(&buffer);
-        println!("Server 1 received: {}", message);
+#[derive(Serialize, Deserialize, Debug)]
+struct Chunk {
+    total_packet_number: usize,
+    position: i16,
+    #[serde(with = "BigArray")]
+    packet: PacketArray,
+}
 
-        let response = match port {
-            54322 => "Server 1 received your message",
-            _ => "Server 1 received your message",
-        };
+fn shift_left(array: &mut [u8; BUFFER_SIZE], positions: usize) {
+    let len = array.len();
 
-        println!("Server 1 responding with: {}", response);
-        //sleep(Duration::from_millis(10000)).await;
-
-        // Send the response to the client's middleware
-        if let Err(err) = socket.send_to(response.as_bytes(), client_address).await {
-            eprintln!(
-                "Server 1 failed to send acknowledgment to middleware: {}",
-                err
-            );
+    // Ensure positions is within array bounds
+    if positions < len {
+        // Copy elements from position `positions` to the beginning of the array
+        for i in 0..len - positions {
+            array[i] = array[i + positions];
         }
-        println!("Middleware address {}", client_address);
+        // Set the remaining positions to default values
+        for i in len - positions..len {
+            array[i] = Default::default();
+        }
+    }
+}
+
+fn remove_trailing_zeros(vec: &mut Vec<u8>) {
+    while let Some(&last_element) = vec.last() {
+        if last_element == 0 {
+            vec.pop();
+        } else {
+            break;
+        }
+    }
+}
+
+async fn middleware_task(middleware_socket: UdpSocket) {
+    // let server_addresses = ["127.0.0.2:21112", "127.0.0.3:21111", "127.0.0.4:21113"];
+    let server_addresses = ["127.0.0.2:21112"];
+    let mut buffer = [0; BUFFER_SIZE];
+    let mut ack_buffer = [0; BUFFER_SIZE];
+    //let middleware_address: SocketAddr = "127.0.0.8:12345".parse().expect("Failed to parse middleware address");
+
+    // let vector = 0
+    // let mut code_zero: String = String::new();
+    // code_zero = "AA".to_string();
+    let mut var=0;
+    let mut serverar=0;
+
+    while let Ok((_bytes_received, client_address)) = middleware_socket.recv_from(&mut buffer).await
+    {
+        var+=1;
+        if client_address.ip().to_string() == "127.0.0.8" {
+            println!("Client:{}",var);
+            let _server_socket = UdpSocket::bind("127.0.0.8:0")
+                .await
+                .expect("Failed to bind server socket");
+            for server_address in &server_addresses
+            {
+                let server_address: SocketAddr = server_address
+                    .parse()
+                    .expect("Failed to parse server address");
+                middleware_socket
+                    .send_to(&buffer[0.._bytes_received], &server_address)
+                    .await
+                    .expect("Failed to send data to server");
+            }
+                shift_left(&mut buffer, _bytes_received);
+                let timeout_duration = Duration::from_secs(12);
+                match timeout(
+                    timeout_duration,
+                    middleware_socket.recv_from(&mut ack_buffer),
+                ).await
+                {
+                    Ok(Ok((ack_bytes_received, _server_address))) => {
+                        let ack_string=format!("Ack {} sent to client",var);
+                        middleware_socket
+                            .send_to(ack_string.as_bytes(), client_address)
+                            .await
+                            .expect("Failed to send acknowledgment to client");
+                        shift_left(&mut ack_buffer, ack_bytes_received);
+                    }
+                    Err(_) => {
+                        // code_zero = "".to_string();
+                        // middleware_socket
+                        //     .send_to(code_zero.as_bytes(), client_address)
+                        //     .await
+                        //     .expect("Failed to send acknowledgment to client");
+                        // code_zero = "AA".to_string();
+                    }
+                    Ok(Err(_e)) => {
+
+                    }
+                }
+           
+        } else {
+            serverar+=1;
+            println!("Server:{}",serverar);
+            let my_client_address="127.0.0.8:3411";
+            middleware_socket
+                .send_to(&buffer[0.._bytes_received], my_client_address)
+                .await
+                .expect("Failed to send acknowledgment to client");
+            middleware_socket
+                .send_to(&buffer[0.._bytes_received], client_address)
+                .await
+                .expect("Failed to send acknowledgment to client");
+            shift_left(&mut ack_buffer, _bytes_received);
+        }
+
+        // Sleep to give time for the server to send the acknowledgment
+        sleep(Duration::from_millis(10)).await;
+
         // Clear the buffer for the next request
-        buffer = [0; 1024];
+        buffer = [0; BUFFER_SIZE];
+        ack_buffer = [0; BUFFER_SIZE];
     }
 }
 
-async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>) {
-    let middleware_socket = UdpSocket::bind(middleware_address)
-        .await
-        .expect("Failed to bind middleware socket");
-    let server_to_server_socket = UdpSocket::bind("127.0.0.2:8080")
-        .await
-        .expect("Failed to bind server to server socket");
-    let just_up_socket = UdpSocket::bind("127.0.0.2:8087")
-        .await
-        .expect("Failed to bind server to server socket");
-    let skip_socket = UdpSocket::bind("127.0.0.2:8088")
-        .await
-        .expect("Failed to bind server to server socket");
+// async fn register_user(
+//     client_socket: UdpSocket,
+//     dos_address: &str,
+//     username: &str,
+//     usertype: &str,
+// ) {
+//     let registration_message = format!("REGISTER:{}:{}", username, usertype);
+//     client_socket
+//         .send_to(registration_message.as_bytes(), dos_address)
+//         .await
+//         .expect("Failed to send registration request");
+//     let mut response_buffer = [0; BUFFER_SIZE];
+//     let (bytes_received, _dos_address) = client_socket
+//         .recv_from(&mut response_buffer)
+//         .await
+//         .expect("Failed to receive response");
+//     let response = String::from_utf8_lossy(&response_buffer[..bytes_received]);
+//     println!("Registration response: {}", response);
+// }
 
-    let mut server_down=0;
-    let real_server_down=0;
-    let server_down_index:i32=10;
-    let server_up_index:i32=20;
-    let mut own_down:i32=0;
-    let mut which_server:i32=500;
-    let mut just_up:i32=0;
-    let mut previous_down:i32=0;
-    let mut just_slept:i32=0;
-    let mut server_down_requests:i32=0;
-    let mut num_down:i32=0;
-    println!("Server middleware is listening on {}", middleware_address);
-    let mut current_server:i32 = 0;
-    let mut receive_buffer = [0; 1024];
-    let mut send_buffer = [0; 1024]; // Separate buffer for sending data
-    while let Ok((bytes_received, client_address)) =
-        middleware_socket.recv_from(&mut receive_buffer).await
-    {
-        println!("Just Slept:{}",just_slept);
-        if(just_slept==1)
-        {
-            just_slept=0;
-            continue;
-        }
-        else if just_slept>1
-        {
-            just_slept=just_slept-1;
-            continue;
-        }
-        else {
-            just_slept=0;
-        }
-        if(which_server==1)
-        {
-            server_down_requests+=1;
-        }
-        if(which_server==500)
-        {
-            server_down_requests=0;
-        }
-        println!("Current Server: {}",current_server);
-        println!("Entered Here 1");
-
-        let mut rng = rand::thread_rng();
-        let random_number: u32 = rng.gen_range(0..10);
-        let index: &[u8] = &current_server.to_be_bytes();
-        let down_index: &[u8] = &server_down_index.to_be_bytes();
-        let up_index: &[u8] = &server_up_index.to_be_bytes();
-
-        let mut server_to_server1_receive_buffer = [0; 4];
-        let mut server_to_server2_receive_buffer = [0; 4];
-        let mut just_up_receive_buffer = [0; 4];
-
-
-        //server_to_server_socket
-        //.connect("127.0.0.3:8080")
-        //.await
-        //.expect("Failed to connect to the server");
-//
-        //server_to_server_socket
-        //.connect("127.0.0.4:8080")
-        //.await
-        //.expect("Failed to connect to the server");
-        if random_number < 1 && server_down==0 && real_server_down==0 && previous_down==0{
-        server_down=0;
-        own_down=1;
-        server_to_server_socket
-            .send_to(down_index, "127.0.0.3:8080")
-            .await
-            .expect("Failed to send index to server 2");
-        server_to_server_socket
-            .send_to(down_index, "127.0.0.4:8080")
-            .await
-            .expect("Failed to send index to server 3");
-        println!("Server 1 going down!");
-        }
-        else {
-            if(which_server==500)
-            {
-            server_to_server_socket
-            .send_to(index, "127.0.0.3:8080")
-            .await
-            .expect("Failed to send index to server 2");
-            server_to_server_socket
-            .send_to(index, "127.0.0.4:8080")
-            .await
-            .expect("Failed to send index to server 3");
-            }
-            else if which_server==1
-            {
-                server_to_server_socket
-            .send_to(index, "127.0.0.4:8080")
-            .await
-            .expect("Failed to send index to server 3");
-            }
-            else if which_server==2
-            {
-            server_to_server_socket
-            .send_to(index, "127.0.0.3:8080")
-            .await
-            .expect("Failed to send index to server 2");
-            }
-        }
-
-
-        server_to_server_socket
-            .recv_from(&mut server_to_server1_receive_buffer)
-            .await
-            .expect("Couldn't recieve index");
-
-        let mut index1 = i32::from_be_bytes([
-            server_to_server1_receive_buffer[0],
-            server_to_server1_receive_buffer[1],
-            server_to_server1_receive_buffer[2],
-            server_to_server1_receive_buffer[3],
-        ]);
-
-        if(server_down==0 || index1>19)
-        {
-        server_to_server_socket
-            .recv_from(&mut server_to_server2_receive_buffer)
-            .await
-            .expect("Couldn't recieve index");
-        }
-
-        let mut index2 = i32::from_be_bytes([
-            server_to_server2_receive_buffer[0],
-            server_to_server2_receive_buffer[1],
-            server_to_server2_receive_buffer[2],
-            server_to_server2_receive_buffer[3],
-        ]);
-
-        println!("Index recieved {}", index1);
-        println!("Index recieved {}", index2);
-
-        if(index1>9 && index1<20 && index2>9 && index2<20 && own_down==1)
-        {
-            index1=current_server;
-            index2=current_server;
-            own_down=0;
-            println!("All 3 servers requested sleep. Overturned!")
-        }
-        else if((own_down==1 && index1>9 && index1<20))
-        {
-            own_down=0;
-            index1=current_server;
-            println!("2 servers requested sleep. Overturned!")
-        }
-        else if((own_down==1 && index2>9 && index2<20))
-        {
-            own_down=0;
-            index2=current_server;
-            println!("2 servers requested sleep. Overturned!")
-        }
-        else if(index1>9 && index1<20 && index2>9 && index2<20 && own_down==0)
-        {
-            index1=current_server;
-            index2=current_server;
-            println!("2 servers not me requested sleep. Overturned!")
-        }
-
-        if (index1>9)
-        {
-            if index1<19
-            {
-                if(index1 == 11)
-                {
-                    println!("Server 2 is down");
-                    server_down=1;
-                    which_server=1;
-                }
-                if(index1 == 12)
-                {
-                    println!("Server 3 is down");
-                    server_down=1;
-                    which_server=2;
-                }
-
-            }
-            else {
-                if index1==21
-                {
-                    println!("Server 2 is back up");
-                    server_down=0;
-                    which_server=500;
-                    just_up=1;
-                }
-                if index1==22
-                {
-                    println!("Server 3 is back up");
-                    server_down=0;
-                    which_server=500;
-                }
-               
-            }
-
-        }
-        if (index2>9)
-        {
-            if index2<19
-            {
-                if(index2 == 11)
-                {
-                    println!("Server 2 is down");
-                    server_down=1;
-                    which_server=1;
-                }
-                if(index2 == 12)
-                {
-                    println!("Server 3 is down");
-                    server_down=1;
-                    which_server=2;
-                }
-
-            }
-            else {
-                if index2==21
-                {
-                    println!("Server 2 is back up");
-                    server_down=0;
-                    which_server=500;
-                    just_up=1;
-                }
-                if index2==22
-                {
-                    println!("Server 3 is back up");
-                    server_down=0;
-                    which_server=500;
-                }
-               
-            }
-
-        }
-
-        if(which_server==500)
-        {
-        if current_server == 0 {
-            current_server += 1;
-            if(just_up==1)
-            {
-            let cs: &[u8] = &current_server.to_be_bytes();
-            server_to_server_socket
-            .send_to(cs, "127.0.0.3:8087")
-            .await.expect("Failed to send index to server 2");
-            let sdr: &[u8] = &server_down_requests.to_be_bytes();
-            server_to_server_socket
-            .send_to(sdr, "127.0.0.3:8088")
-            .await.expect("Failed to send index to server 3");
-            just_up=0;
-            }
-        } else if current_server == 1 {
-            current_server += 1;
-            if(just_up==1)
-            {
-            let cs: &[u8] = &current_server.to_be_bytes();
-            server_to_server_socket
-            .send_to(cs, "127.0.0.3:8087")
-            .await.expect("Failed to send index to server 2");
-            let sdr: &[u8] = &server_down_requests.to_be_bytes();
-            server_to_server_socket
-            .send_to(sdr, "127.0.0.3:8088")
-            .await.expect("Failed to send index to server 3");
-            just_up=0;
-            }
-            if(own_down==1)
-            {
-            tokio::time::sleep(Duration::from_secs(40)).await;
-            previous_down=6;
-            println!("Server 1 going up!");
-            server_to_server_socket
-            .send_to(up_index, "127.0.0.3:8080")
-            .await
-            .expect("Failed to send index to server 2");
-            server_to_server_socket
-            .send_to(up_index, "127.0.0.4:8080")
-            .await
-            .expect("Failed to send index to server 3");
-            own_down=0;
-            server_down=0;
-            just_up_socket
-            .recv_from(&mut just_up_receive_buffer)
-            .await
-            .expect("Couldn't recieve index");
-            current_server=i32::from_be_bytes([
-                just_up_receive_buffer[0],
-                just_up_receive_buffer[1],
-                just_up_receive_buffer[2],
-                just_up_receive_buffer[3],
-            ]);
-            just_up_receive_buffer = [0; 4];
-            skip_socket
-            .recv_from(&mut just_up_receive_buffer)
-            .await
-            .expect("Couldn't recieve index");
-            just_slept=i32::from_be_bytes([
-            just_up_receive_buffer[0],
-            just_up_receive_buffer[1],
-            just_up_receive_buffer[2],
-            just_up_receive_buffer[3],
-            ]);
-            //current_server=1-current_server;
-            if(just_slept>90)
-            {
-                just_slept=93;
-            }
-            println!("Current Server Down {}",current_server);
-            println!("I am here");
-            just_up_receive_buffer = [0; 4];
-            //receive_buffer = [0; 1024];
-            //receive_buffer = [0; 1024];
-            num_down+=1;
-            if(num_down>1)
-            {
-                //just_slept=just_slept+1;
-                just_slept=just_slept;
-            }
-            }
-            continue;
-        } else if current_server == 2{
-            current_server = 0;
-            if(just_up==1)
-            {
-            let cs: &[u8] = &current_server.to_be_bytes();
-            server_to_server_socket
-            .send_to(cs, "127.0.0.3:8087")
-            .await.expect("Failed to send index to server 2");
-            let sdr: &[u8] = &server_down_requests.to_be_bytes();
-            server_to_server_socket
-            .send_to(sdr, "127.0.0.3:8088")
-            .await.expect("Failed to send index to server 3");
-            just_up=0;
-            }
-            if(own_down==1)
-            {
-                tokio::time::sleep(Duration::from_secs(40)).await;
-                previous_down=6;
-                println!("Server 1 going up!");
-                server_to_server_socket
-                .send_to(up_index, "127.0.0.3:8080")
-                .await
-                .expect("Failed to send index to server 2");
-                server_to_server_socket
-                .send_to(up_index, "127.0.0.4:8080")
-                .await
-                .expect("Failed to send index to server 3");
-                own_down=0;
-                server_down=0;
-                just_up_socket
-                .recv_from(&mut just_up_receive_buffer)
-                .await
-                .expect("Couldn't recieve index");
-                current_server=i32::from_be_bytes([
-                    just_up_receive_buffer[0],
-                    just_up_receive_buffer[1],
-                    just_up_receive_buffer[2],
-                    just_up_receive_buffer[3],
-                ]);
-                just_up_receive_buffer = [0; 4];
-                skip_socket
-                .recv_from(&mut just_up_receive_buffer)
-                .await
-                .expect("Couldn't recieve index");
-                just_slept=i32::from_be_bytes([
-                just_up_receive_buffer[0],
-                just_up_receive_buffer[1],
-                just_up_receive_buffer[2],
-                just_up_receive_buffer[3],
-                ]);
-                if(just_slept>90)
-            {
-                just_slept=93;
-            }
-                //current_server=1-current_server;
-                println!("Current Server Down {}",current_server);
-                println!("I am here");
-                just_up_receive_buffer = [0; 4];
-                //receive_buffer = [0; 1024];
-                //receive_buffer = [0; 1024];
-                num_down+=1;
-                if(num_down>1)
-                {
-                    //just_slept=just_slept+1;
-                    just_slept=just_slept;
-                }
-            }
-            continue;
-        }
-    }
-    else if (which_server==1)
-    {
-
-        if current_server == 0{
-            current_server += 2;
-
-        } else if current_server == 1 {
-            current_server += 1;
-            continue;
-        } else if current_server == 2 {
-            current_server = 0;
-            continue;
-        }
-    }
-    else if (which_server==2)
-    {
-        if current_server == 0 {
-            current_server += 1;
-        } else if current_server == 1{
-            current_server = 0;
-            continue;
-        } else if current_server == 2 {
-            current_server = 0;
-            continue;
-        }
-    }
-    else {
-        println!("No which server variable");
-    }
-
-        let server_index = 0; // You can implement load balancing logic here
-        let server_address = server_addresses[server_index];
-        let server_address: SocketAddr = server_address
-            .parse()
-            .expect("Failed to parse server address");
-
-        let server_socket = UdpSocket::bind("127.0.0.2:0")
-            .await
-            .expect("Failed to bind server socket");
-        server_socket
-            .connect(&server_address)
-            .await
-            .expect("Failed to connect to the server");
-
-        // Copy the received data to the send buffer
-        send_buffer[..bytes_received].copy_from_slice(&receive_buffer[..bytes_received]);
-
-        server_socket
-            .send_to(&send_buffer[..bytes_received], &server_address)
-            .await
-            .expect("Failed to send data to server");
-        println!("Entered Here 2");
-
-        let (ack_bytes_received, server_caddress) = server_socket
-            .recv_from(&mut receive_buffer)
-            .await
-            .expect("Failed to receive acknowledgment from server");
-        println!("Entered Here 3");
-        println!("Server address {}", server_caddress);
-
-        // Send the acknowledgment from the server to the client's middleware
-        middleware_socket
-            .send_to(&receive_buffer[..ack_bytes_received], client_address)
-            .await
-            .expect("Failed to send acknowledgment to client");
-        println!("Entered Here 4");
-        println!("Client Address:{}",client_address);
-
-        // Clear the receive buffer for the next request
-        server_to_server1_receive_buffer = [0; 4];
-        server_to_server2_receive_buffer = [0; 4];
-        receive_buffer = [0; 1024];
-        if(own_down==1)
-        {
-            tokio::time::sleep(Duration::from_secs(40)).await;
-            previous_down=6;
-            println!("Server 1 going up!");
-            server_to_server_socket
-            .send_to(up_index, "127.0.0.3:8080")
-            .await
-            .expect("Failed to send index to server 1");
-            server_to_server_socket
-            .send_to(up_index, "127.0.0.4:8080")
-            .await
-            .expect("Failed to send index to server 2");
-            own_down=0;
-            server_down=0;
-            server_to_server_socket
-            .recv_from(&mut just_up_receive_buffer)
-            .await
-            .expect("Couldn't recieve index");
-            current_server=i32::from_be_bytes([
-                just_up_receive_buffer[0],
-                just_up_receive_buffer[1],
-                just_up_receive_buffer[2],
-                just_up_receive_buffer[3],
-            ]);
-            just_up_receive_buffer = [0; 4];
-            skip_socket
-            .recv_from(&mut just_up_receive_buffer)
-            .await
-            .expect("Couldn't recieve index");
-            just_slept=i32::from_be_bytes([
-            just_up_receive_buffer[0],
-            just_up_receive_buffer[1],
-            just_up_receive_buffer[2],
-            just_up_receive_buffer[3],
-            ]);
-            //current_server=1-current_server;
-            if(just_slept>90)
-            {
-                just_slept=93;
-            }
-            println!("Current Server Down {}",current_server);
-            println!("I am here");
-            just_up_receive_buffer = [0; 4];
-            //receive_buffer = [0; 1024];
-            //receive_buffer = [0; 1024];
-            num_down+=1;
-            if(num_down>1)
-            {
-                //just_slept=just_slept+1;
-                just_slept=just_slept;
-            }
-        }
-        just_up_receive_buffer = [0; 4];
-    }
-}
+// async fn query_online_users(client_socket: UdpSocket, middleware_address: &str) {
+//     // Send a query message to request the list of online users
+//     client_socket
+//         .send_to("QUERY".as_bytes(), middleware_address)
+//         .await
+//         .expect("Failed to send query request");
+//     let mut response_buffer = [0; BUFFER_SIZE];
+//     let (bytes_received, _middleware_address) = client_socket
+//         .recv_from(&mut response_buffer)
+//         .await
+//         .expect("Failed to receive response");
+//     let response = String::from_utf8_lossy(&response_buffer[..bytes_received]);
+//     println!("Online users: {}", response);
+// }
 
 #[tokio::main]
 async fn main() {
-    let middleware_address: SocketAddr = "127.0.0.2:21112"
+    let dos_address = "127.0.0.255:12345";
+    let middleware_address: SocketAddr = "127.0.0.8:12345"
         .parse()
         .expect("Failed to parse middleware address");
-    let middleware_address_str = middleware_address.to_string();
+    let client_socket = UdpSocket::bind("127.0.0.8:3411")
+        .await
+        .expect("Failed to bind client socket");
+    //let client_socket_register = UdpSocket::bind("127.0.0.8:8090").await.expect("Failed to bind client socket");
+    //let client_socket_query = UdpSocket::bind("127.0.0.8:8091").await.expect("Failed to bind client socket");
+    //register_user(client_socket_register,dos_address, "Client1","Client").await;
+    //println!("Finished Registry");
+    //query_online_users(client_socket_query,dos_address).await;
+    let middleware_socket = UdpSocket::bind(&middleware_address)
+        .await
+        .expect("Failed to bind middleware socket");
 
-    // Define the server addresses and middleware addresses
-    let server_addresses = ["127.0.0.2:54321", "127.0.0.3:54322", "127.0.0.4:54323"];
-    let server3_task = server3("127.0.0.2:54321", &middleware_address_str);
+    tokio::spawn(middleware_task(middleware_socket));
+    let _dos_address_clone = dos_address; // Assuming `dos_address` is defined elsewhere
+    let termination = Arc::new(Mutex::new(0));
+    let termination_clone = Arc::clone(&termination);
 
-    // Start the server middleware
-    let server_middleware_task =
-        server_middleware(&middleware_address_str, server_addresses.to_vec());
-    let _ = tokio::join!(server3_task, server_middleware_task);
+    let mut signal = signal(SignalKind::interrupt()).expect("Failed to create signal handler");
+    tokio::spawn(async move {
+        signal.recv().await;
+        println!("Received termination signal");
+
+        //let unregister_message = "UNREGISTER";
+        //let dos_socket = UdpSocket::bind("127.0.0.8:9000").await.expect("Failed to bind socket");
+        //dos_socket
+        //    .send_to(unregister_message.as_bytes(), dos_address_clone)
+        //    .await
+        //    .expect("Failed to send unregister message");
+        //
+        // Notify other tasks waiting for the signal
+        //let _ = tx.send(());
+        *termination_clone.lock().unwrap() = 1;
+
+        // Exit the application
+        std::process::exit(0);
+        //return;
+    });
+
+    while *termination.lock().unwrap() == 0 {
+        println!("Press Enter to send a Request");
+        let mut input = String::new();
+        std::io::stdin()
+            .read_line(&mut input)
+            .expect("Failed to read line");
+        if input.trim() == "" {
+            let mut client_buffer = [0; BUFFER_SIZE];
+
+            println!("Sending Image");
+            let image_data = fs::read("image.png").expect("Failed to read the image file");
+            let middleware_address = "0.0.0.0:12345"; // Replace with the actual middleware address and port
+                                                      //sleep(Duration::from_millis(5000)).await;
+
+            let packet_number = (image_data.len() / MAX_CHUNCK)+1;
+            for (index, piece) in image_data.chunks(MAX_CHUNCK).enumerate() {
+                let is_last_piece = index == packet_number-1;
+                let chunk = Chunk {
+                    total_packet_number: packet_number,
+                    position: if is_last_piece {
+                        -1
+                    } else {
+                        index.try_into().unwrap()
+                    },
+                    packet: {
+                        let mut packet_array = [0; MAX_CHUNCK];
+                        packet_array[..piece.len()].copy_from_slice(piece);
+                        packet_array
+                    },
+                   
+                };
+                let serialized = serde_json::to_string(&chunk).unwrap();
+
+                client_socket
+                    .send_to(&serialized.as_bytes(), middleware_address)
+                    .await
+                    .expect("Failed to send piece to middleware");
+
+                if index !=packet_number-1
+                {
+                    let (num_bytes_received, _)=client_socket
+                    .recv_from(&mut client_buffer)
+                    .await
+                    .expect("Failed to receive acknowledgement from server");
+                let received_string = String::from_utf8_lossy(&client_buffer[..num_bytes_received]);
+                println!("Received {}",received_string);
+                }
+            }
+            println!("Finished All Packets");
+            println!("{}",packet_number);
+
+            let mut encrypted_image_data: Vec<u8> = Vec::new();
+            let mut image_chunks = HashMap::<i16, PacketArray>::new();
+            let mut j=0;
+            let mut enecrypted_image_packet_number=packet_number;
+
+
+            while j<enecrypted_image_packet_number {
+                if let Ok((_bytes_received, _client_address)) =
+                    client_socket.recv_from(&mut client_buffer).await
+                {
+                    let packet_string = String::from_utf8_lossy(&client_buffer[0.._bytes_received]);
+                    let deserialized: Chunk = serde_json::from_str(&packet_string).unwrap();
+                    enecrypted_image_packet_number=deserialized.total_packet_number;
+                    let mio=deserialized.position;
+                    println!("EIPN {}",mio);
+                    shift_left(&mut client_buffer, _bytes_received);
+                    if j == enecrypted_image_packet_number-1 {
+                        image_chunks.insert(enecrypted_image_packet_number.try_into().unwrap(), deserialized.packet);
+                        println!("Ana 5aragt {}",j);
+                    } else {
+                        image_chunks.insert(deserialized.position, deserialized.packet);
+                    }
+                    j+=1;
+                }
+            }
+            println!("Ana 5aragt");
+            let image_chunks_cloned: BTreeMap<_, _> = image_chunks.clone().into_iter().collect();
+
+            for (_key, value) in image_chunks_cloned {
+                // println!("Key: {}, Value: {:?}", key, value);
+                encrypted_image_data.extend_from_slice(&value);
+            }
+           
+
+            remove_trailing_zeros(&mut encrypted_image_data);
+            println!("EID Size {}",encrypted_image_data.len());
+
+            if let Ok(encrypted_image) = image::load_from_memory(&encrypted_image_data) {
+                let (width, height) = encrypted_image.dimensions();
+                println!("Image dimensions: {} x {}", width, height);
+
+                if let Err(err) = encrypted_image.save("encrypted.png") {
+                    eprintln!("Failed to save the image: {}", err);
+                } else {
+                    println!("Image saved successfully");
+                }
+            } else {
+                println!("Failed to create image from byte stream");
+            }
+
+
+            let encoded_image = file_as_image_buffer("encrypted.png".to_string());
+            let dec = Decoder::new(encoded_image);
+            let out_buffer = dec.decode_alpha();
+            let clean_buffer: Vec<u8> = out_buffer.into_iter().filter(|b| *b != 0xff_u8).collect();
+            let message = bytes_to_str(clean_buffer.as_slice());
+
+
+
+            let decoded_image_data = base64::decode(message).unwrap_or_else(|e| {
+                eprintln!("Error decoding base64: {}", e);
+                Vec::new()
+            });
+
+            if let Ok(decoded_image) = image::load_from_memory(&decoded_image_data) {
+                let (width, height) = decoded_image.dimensions();
+                println!("Image dimensions: {} x {}", width, height);
+
+                if let Err(err) = decoded_image.save("decoded.png") {
+                    eprintln!("Failed to save the image: {}", err);
+                } else {
+                    println!("Image saved successfully");
+                }
+            } else {
+                println!("Failed to create image from byte stream");
+            }
+        }
+    }
 }
+
+

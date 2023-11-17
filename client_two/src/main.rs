@@ -112,4 +112,8 @@ async fn main() {
 
     // Wait for the middleware task to finish
     middleware_task.await.expect("Middleware task failed");
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> origin/image-passing

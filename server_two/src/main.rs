@@ -1,9 +1,7 @@
 use async_std::net::UdpSocket;
 use std::net::SocketAddr;
-use std::time::Duration;
-use rand::Rng;
 
-async fn server3(server_address: &str, _middleware_address: &str) {
+async fn server2(server_address: &str, _middleware_address: &str) {
     let parts: Vec<&str> = server_address.split(':').collect();
     let port = parts[1]
         .parse::<u16>()
@@ -601,12 +599,10 @@ async fn main() {
 
     // Define the server addresses and middleware addresses
     let server_addresses = ["127.0.0.2:54321", "127.0.0.3:54322", "127.0.0.4:54323"];
-    let server3_task = server3("127.0.0.3:54322", &middleware_address_str);
+    let server2_task = server2("127.0.0.3:54322", &middleware_address_str);
 
     // Start the server middleware
     let server_middleware_task =
         server_middleware(&middleware_address_str, server_addresses.to_vec());
-    let _ = tokio::join!(server3_task, server_middleware_task);
+    let _ = tokio::join!(server2_task, server_middleware_task);
 }
-
-
