@@ -1,4 +1,3 @@
-Client:
 use async_std::net::UdpSocket;
 use image::GenericImageView;
 use serde::{Deserialize, Serialize};
@@ -64,19 +63,18 @@ async fn middleware_task(middleware_socket: UdpSocket) {
     // let vector = 0
     // let mut code_zero: String = String::new();
     // code_zero = "AA".to_string();
-    let mut var=0;
-    let mut serverar=0;
+    let mut var = 0;
+    let mut serverar = 0;
 
     while let Ok((_bytes_received, client_address)) = middleware_socket.recv_from(&mut buffer).await
     {
-        var+=1;
+        var += 1;
         if client_address.ip().to_string() == "127.0.0.8" {
-            println!("Client:{}",var);
+            println!("Client:{}", var);
             let _server_socket = UdpSocket::bind("127.0.0.8:0")
                 .await
                 .expect("Failed to bind server socket");
-            for server_address in &server_addresses
-            {
+            for server_address in &server_addresses {
                 let server_address: SocketAddr = server_address
                     .parse()
                     .expect("Failed to parse server address");
@@ -85,38 +83,36 @@ async fn middleware_task(middleware_socket: UdpSocket) {
                     .await
                     .expect("Failed to send data to server");
             }
-                shift_left(&mut buffer, _bytes_received);
-                let timeout_duration = Duration::from_secs(12);
-                match timeout(
-                    timeout_duration,
-                    middleware_socket.recv_from(&mut ack_buffer),
-                ).await
-                {
-                    Ok(Ok((ack_bytes_received, _server_address))) => {
-                        let ack_string=format!("Ack {} sent to client",var);
-                        middleware_socket
-                            .send_to(ack_string.as_bytes(), client_address)
-                            .await
-                            .expect("Failed to send acknowledgment to client");
-                        shift_left(&mut ack_buffer, ack_bytes_received);
-                    }
-                    Err(_) => {
-                        // code_zero = "".to_string();
-                        // middleware_socket
-                        //     .send_to(code_zero.as_bytes(), client_address)
-                        //     .await
-                        //     .expect("Failed to send acknowledgment to client");
-                        // code_zero = "AA".to_string();
-                    }
-                    Ok(Err(_e)) => {
-
-                    }
+            shift_left(&mut buffer, _bytes_received);
+            let timeout_duration = Duration::from_secs(12);
+            match timeout(
+                timeout_duration,
+                middleware_socket.recv_from(&mut ack_buffer),
+            )
+            .await
+            {
+                Ok(Ok((ack_bytes_received, _server_address))) => {
+                    let ack_string = format!("Ack {} sent to client", var);
+                    middleware_socket
+                        .send_to(ack_string.as_bytes(), client_address)
+                        .await
+                        .expect("Failed to send acknowledgment to client");
+                    shift_left(&mut ack_buffer, ack_bytes_received);
                 }
-           
+                Err(_) => {
+                    // code_zero = "".to_string();
+                    // middleware_socket
+                    //     .send_to(code_zero.as_bytes(), client_address)
+                    //     .await
+                    //     .expect("Failed to send acknowledgment to client");
+                    // code_zero = "AA".to_string();
+                }
+                Ok(Err(_e)) => {}
+            }
         } else {
-            serverar+=1;
-            println!("Server:{}",serverar);
-            let my_client_address="127.0.0.8:3411";
+            serverar += 1;
+            println!("Server:{}", serverar);
+            let my_client_address = "127.0.0.8:3411";
             middleware_socket
                 .send_to(&buffer[0.._bytes_received], my_client_address)
                 .await
@@ -230,9 +226,9 @@ async fn main() {
             let middleware_address = "0.0.0.0:12345"; // Replace with the actual middleware address and port
                                                       //sleep(Duration::from_millis(5000)).await;
 
-            let packet_number = (image_data.len() / MAX_CHUNCK)+1;
+            let packet_number = (image_data.len() / MAX_CHUNCK) + 1;
             for (index, piece) in image_data.chunks(MAX_CHUNCK).enumerate() {
-                let is_last_piece = index == packet_number-1;
+                let is_last_piece = index == packet_number - 1;
                 let chunk = Chunk {
                     total_packet_number: packet_number,
                     position: if is_last_piece {
@@ -245,7 +241,6 @@ async fn main() {
                         packet_array[..piece.len()].copy_from_slice(piece);
                         packet_array
                     },
-                   
                 };
                 let serialized = serde_json::to_string(&chunk).unwrap();
 
@@ -254,42 +249,44 @@ async fn main() {
                     .await
                     .expect("Failed to send piece to middleware");
 
-                if index !=packet_number-1
-                {
-                    let (num_bytes_received, _)=client_socket
-                    .recv_from(&mut client_buffer)
-                    .await
-                    .expect("Failed to receive acknowledgement from server");
-                let received_string = String::from_utf8_lossy(&client_buffer[..num_bytes_received]);
-                println!("Received {}",received_string);
+                if index != packet_number - 1 {
+                    let (num_bytes_received, _) = client_socket
+                        .recv_from(&mut client_buffer)
+                        .await
+                        .expect("Failed to receive acknowledgement from server");
+                    let received_string =
+                        String::from_utf8_lossy(&client_buffer[..num_bytes_received]);
+                    println!("Received {}", received_string);
                 }
             }
             println!("Finished All Packets");
-            println!("{}",packet_number);
+            println!("{}", packet_number);
 
             let mut encrypted_image_data: Vec<u8> = Vec::new();
             let mut image_chunks = HashMap::<i16, PacketArray>::new();
-            let mut j=0;
-            let mut enecrypted_image_packet_number=packet_number;
+            let mut j = 0;
+            let mut enecrypted_image_packet_number = packet_number;
 
-
-            while j<enecrypted_image_packet_number {
+            while j < enecrypted_image_packet_number {
                 if let Ok((_bytes_received, _client_address)) =
                     client_socket.recv_from(&mut client_buffer).await
                 {
                     let packet_string = String::from_utf8_lossy(&client_buffer[0.._bytes_received]);
                     let deserialized: Chunk = serde_json::from_str(&packet_string).unwrap();
-                    enecrypted_image_packet_number=deserialized.total_packet_number;
-                    let mio=deserialized.position;
-                    println!("EIPN {}",mio);
+                    enecrypted_image_packet_number = deserialized.total_packet_number;
+                    let mio = deserialized.position;
+                    println!("EIPN {}", mio);
                     shift_left(&mut client_buffer, _bytes_received);
-                    if j == enecrypted_image_packet_number-1 {
-                        image_chunks.insert(enecrypted_image_packet_number.try_into().unwrap(), deserialized.packet);
-                        println!("Ana 5aragt {}",j);
+                    if j == enecrypted_image_packet_number - 1 {
+                        image_chunks.insert(
+                            enecrypted_image_packet_number.try_into().unwrap(),
+                            deserialized.packet,
+                        );
+                        println!("Ana 5aragt {}", j);
                     } else {
                         image_chunks.insert(deserialized.position, deserialized.packet);
                     }
-                    j+=1;
+                    j += 1;
                 }
             }
             println!("Ana 5aragt");
@@ -299,10 +296,9 @@ async fn main() {
                 // println!("Key: {}, Value: {:?}", key, value);
                 encrypted_image_data.extend_from_slice(&value);
             }
-           
 
             remove_trailing_zeros(&mut encrypted_image_data);
-            println!("EID Size {}",encrypted_image_data.len());
+            println!("EID Size {}", encrypted_image_data.len());
 
             if let Ok(encrypted_image) = image::load_from_memory(&encrypted_image_data) {
                 let (width, height) = encrypted_image.dimensions();
@@ -317,14 +313,11 @@ async fn main() {
                 println!("Failed to create image from byte stream");
             }
 
-
             let encoded_image = file_as_image_buffer("encrypted.png".to_string());
             let dec = Decoder::new(encoded_image);
             let out_buffer = dec.decode_alpha();
             let clean_buffer: Vec<u8> = out_buffer.into_iter().filter(|b| *b != 0xff_u8).collect();
             let message = bytes_to_str(clean_buffer.as_slice());
-
-
 
             let decoded_image_data = base64::decode(message).unwrap_or_else(|e| {
                 eprintln!("Error decoding base64: {}", e);
