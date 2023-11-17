@@ -103,7 +103,7 @@ async fn server1(server_address: &str, _middleware_address: &str) {
             let destination_image = file_as_dynamic_image("encrypt.png".to_string());
             let enc = Encoder::new(payload, destination_image);
             let result = enc.encode_alpha();
-            save_image_buffer(result, "encrypted.png".to_string());
+            // save_image_buffer(result, "encrypted.png".to_string());
 
             println!("Sending encrypted image");
             image_data.clear();
