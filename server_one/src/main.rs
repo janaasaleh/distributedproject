@@ -142,6 +142,7 @@ async fn server1(server_address: &str, _middleware_address: &str) {
                     .expect("Failed to receive acknowledgement from server");
                 println!("Server received ack packet {}", index);
             }
+            image_data.clear();
         }
     }
 }
@@ -300,10 +301,12 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
         .recv_from(&mut server1_load_receive_buffer)
         .await
         .expect("Couldn't recieve index");
+        println!("DOne 2");
         server_to_server_socket
             .recv_from(&mut server_to_server1_receive_buffer)
             .await
             .expect("Couldn't recieve index");
+        println!("DOne 3");
         let mut index1 = i32::from_be_bytes([
             server_to_server1_receive_buffer[0],
             server_to_server1_receive_buffer[1],
@@ -316,15 +319,18 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
 
         if(server_down==0 || index1>19)
         {
+        println!("DOne 3.5");
         server_to_server_socket
             .recv_from(&mut server_to_server2_receive_buffer)
             .await
             .expect("Couldn't recieve index");
+        println!("DOne 3.75");
         let (ss_rrr,_)=server_load_socket
                 .recv_from(&mut server2_load_receive_buffer)
                 .await
                 .expect("Couldn't recieve index");
         ss_bytes=ss_rrr;
+        println!("DOne 3");
         }
 
         let mut index2 = i32::from_be_bytes([
@@ -477,6 +483,14 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                         .send_to(up_index, "127.0.0.4:8080")
                         .await
                         .expect("Failed to send index to server 3");
+                    server_load_socket
+                    .send_to("".as_bytes(), "127.0.0.3:8100")
+                    .await
+                    .expect("Failed to send index to server 1");
+                    server_load_socket
+                    .send_to("".as_bytes(), "127.0.0.4:8100")
+                    .await
+                    .expect("Failed to send index to server 2");
                     own_down = 0;
                     server_down = 0;
                     just_up_socket
@@ -501,8 +515,8 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                         just_up_receive_buffer[3],
                     ]);
                     //current_server=1-current_server;
-                    if just_slept > 90 {
-                        just_slept = 93;
+                    if just_slept > 4 {
+                        just_slept=4;
                     }
                     println!("Current Server Down {}", current_server);
                     println!("I am here");
@@ -546,6 +560,14 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                         .send_to(up_index, "127.0.0.4:8080")
                         .await
                         .expect("Failed to send index to server 3");
+                    server_load_socket
+                    .send_to("".as_bytes(), "127.0.0.3:8100")
+                    .await
+                    .expect("Failed to send index to server 1");
+                    server_load_socket
+                    .send_to("".as_bytes(), "127.0.0.4:8100")
+                    .await
+                    .expect("Failed to send index to server 2");
                     own_down = 0;
                     server_down = 0;
                     just_up_socket
@@ -569,8 +591,8 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                         just_up_receive_buffer[2],
                         just_up_receive_buffer[3],
                     ]);
-                    if just_slept > 90 {
-                        just_slept = 93;
+                    if just_slept > 4 {
+                        just_slept=4;
                     }
                     //current_server=1-current_server;
                     println!("Current Server Down {}", current_server);
@@ -593,6 +615,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
             if current_server == 0 {
                 current_server += 2;
                 if ip_string == my_load {
+                    println!("Here");
                 } else if my_load == "" && ip_string != otherload1 && ip_string != otherload2 {
                     let ip_strings: String = ip.to_string();
                     my_load = ip_strings;
@@ -774,6 +797,14 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                     .send_to(up_index, "127.0.0.4:8080")
                     .await
                     .expect("Failed to send index to server 2");
+                server_load_socket
+                    .send_to("".as_bytes(), "127.0.0.3:8100")
+                    .await
+                    .expect("Failed to send index to server 1");
+                    server_load_socket
+                    .send_to("".as_bytes(), "127.0.0.4:8100")
+                    .await
+                    .expect("Failed to send index to server 2");
                 own_down = 0;
                 server_down = 0;
                 server_to_server_socket
@@ -798,8 +829,8 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                     just_up_receive_buffer[3],
                 ]);
                 //current_server=1-current_server;
-                if just_slept > 90 {
-                    just_slept = 93;
+                if just_slept > 4 {
+                    just_slept=4;
                 }
                 println!("Current Server Down {}", current_server);
                 println!("I am here");
@@ -835,4 +866,4 @@ async fn main() {
     let _ = tokio::join!(server1_task, server_middleware_task);
 }
 
-	
+
