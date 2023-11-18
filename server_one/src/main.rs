@@ -143,6 +143,7 @@ async fn server1(server_address: &str, _middleware_address: &str) {
                 println!("Server received ack packet {}", index);
             }
             image_data.clear();
+            buffer=[0;BUFFER_SIZE]
         }
     }
 }
@@ -208,6 +209,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
         }
         println!("Current Server: {}", current_server);
         println!("Entered Here 1");
+        println!("SDR:{}", server_down_requests);
 
         let mut rng = rand::thread_rng();
         let random_number: u32 = rng.gen_range(0..10);
@@ -345,6 +347,8 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
 
         println!("Index recieved {}", index1);
         println!("Index recieved {}", index2);
+        println!("Other Load 1 {}", otherload1);
+        println!("Other Load 2 {}", otherload2);
 
         if index1 > 9 && index1 < 20 && index2 > 9 && index2 < 20 && own_down == 1 {
             index1 = current_server;
@@ -440,6 +444,11 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                     my_load = ip_strings;
                     let packet_string = String::from_utf8_lossy(&receive_buffer[0..bytes_received]);
                     let deserialized: Chunk = serde_json::from_str(&packet_string).unwrap();
+                    println!("IP:{}",ip_string);
+                    println!("OTHERLOAD 1 {}",otherload1);
+                    println!("OTHERLOAD 2 {}",otherload2);
+                    println!("OTHERLOAD 1 {}",otherload1==ip_string);
+                    println!("OTHERLOAD 2 {}",otherload2==ip_string);
 
                     _my_packets = deserialized.total_packet_number;
                     println!("{}", _my_packets);
@@ -473,6 +482,24 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                 }
                 if own_down == 1 {
                     tokio::time::sleep(Duration::from_secs(40)).await;
+                    loop {
+                        match tokio::time::timeout(Duration::from_secs(1), middleware_socket.recv_from(&mut receive_buffer)).await {
+                            Ok(Ok((bytes_received, client_address))) => {
+                                // Request received, continue processing
+                                //println!("Received {} bytes from {}: {:?}", bytes_received, client_address, &receive_buffer[..bytes_received]);
+                                // Continue processing...
+                            }
+                            Ok(Err(e)) => {
+                                // Error while receiving
+                                eprintln!("Error receiving data: {:?}", e);
+                            }
+                            Err(_) => {
+                                // Timeout reached, exit the loop or take appropriate action
+                                println!("Timeout reached");
+                                break;
+                            }
+                        }
+                    }
                     previous_down = 6;
                     println!("Server 1 going up!");
                     server_to_server_socket
@@ -518,6 +545,9 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                     if just_slept > 4 {
                         just_slept = 4;
                     }
+                    if just_slept > 380 {
+                        just_slept = 5;
+                    }
                     println!("Current Server Down {}", current_server);
                     println!("I am here");
                     just_up_receive_buffer = [0; 4];
@@ -550,6 +580,24 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                 }
                 if own_down == 1 {
                     tokio::time::sleep(Duration::from_secs(40)).await;
+                    loop {
+                        match tokio::time::timeout(Duration::from_secs(1), middleware_socket.recv_from(&mut receive_buffer)).await {
+                            Ok(Ok((bytes_received, client_address))) => {
+                                // Request received, continue processing
+                                //println!("Received {} bytes from {}: {:?}", bytes_received, client_address, &receive_buffer[..bytes_received]);
+                                // Continue processing...
+                            }
+                            Ok(Err(e)) => {
+                                // Error while receiving
+                                eprintln!("Error receiving data: {:?}", e);
+                            }
+                            Err(_) => {
+                                // Timeout reached, exit the loop or take appropriate action
+                                println!("Timeout reached");
+                                break;
+                            }
+                        }
+                    }
                     previous_down = 6;
                     println!("Server 1 going up!");
                     server_to_server_socket
@@ -591,8 +639,11 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                         just_up_receive_buffer[2],
                         just_up_receive_buffer[3],
                     ]);
-                    if just_slept > 4 {
+                    if (just_slept > 4) {
                         just_slept = 4;
+                    }
+                    if (just_slept > 380) {
+                        just_slept = 5;
                     }
                     //current_server=1-current_server;
                     println!("Current Server Down {}", current_server);
@@ -774,6 +825,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
             println!("Just chill bara");
             current_packet = 0;
             my_load = "".to_string();
+            receive_buffer=[0;BUFFER_SIZE];
         } else {
             let (ack_bytes_received, server_caddress) = server_socket
                 .recv_from(&mut receive_buffer)
@@ -790,6 +842,24 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
             receive_buffer = [0; BUFFER_SIZE];
             if own_down == 1 {
                 tokio::time::sleep(Duration::from_secs(40)).await;
+                loop {
+                    match tokio::time::timeout(Duration::from_secs(1), middleware_socket.recv_from(&mut receive_buffer)).await {
+                        Ok(Ok((bytes_received, client_address))) => {
+                            // Request received, continue processing
+                            //println!("Received {} bytes from {}: {:?}", bytes_received, client_address, &receive_buffer[..bytes_received]);
+                            // Continue processing...
+                        }
+                        Ok(Err(e)) => {
+                            // Error while receiving
+                            eprintln!("Error receiving data: {:?}", e);
+                        }
+                        Err(_) => {
+                            // Timeout reached, exit the loop or take appropriate action
+                            println!("Timeout reached");
+                            break;
+                        }
+                    }
+                }
                 previous_down = 6;
                 println!("Server 1 going up!");
                 server_to_server_socket
@@ -832,8 +902,11 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                     just_up_receive_buffer[3],
                 ]);
                 //current_server=1-current_server;
-                if just_slept > 4 {
+                if (just_slept > 4) {
                     just_slept = 4;
+                }
+                if (just_slept > 380) {
+                    just_slept = 5;
                 }
                 println!("Current Server Down {}", current_server);
                 println!("I am here");

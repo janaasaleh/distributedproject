@@ -62,7 +62,7 @@ async fn server3(server_address: &str, _middleware_address: &str) {
     let socket = UdpSocket::bind(&server_address)
         .await
         .expect("Failed to bind server socket");
-    println!("Server 1 socket is listening on {}", server_address);
+    println!("Server 2 socket is listening on {}", server_address);
 
     let mut buffer = [0; BUFFER_SIZE];
     let mut image_data: Vec<u8> = Vec::new();
@@ -143,6 +143,7 @@ async fn server3(server_address: &str, _middleware_address: &str) {
                 println!("Server received ack packet {}", index);
             }
             image_data.clear();
+            buffer=[0;BUFFER_SIZE];
         }
     }
 }
@@ -229,7 +230,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
         //.connect("127.0.0.4:8080")
         //.await
         //.expect("Failed to connect to the server");
-        if random_number < 4
+        if random_number < 0
             && server_down == 0
             && real_server_down == 0
             && previous_down == 0
@@ -480,8 +481,11 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                         just_up_receive_buffer[3],
                     ]);
                     //current_server=1-current_server;
-                    if (just_slept > 90) {
+                    if (just_slept > 4) {
                         just_slept = 4;
+                    }
+                    if (just_slept > 380) {
+                        just_slept = 5;
                     }
                     println!("Current Server Down {}", current_server);
                     println!("I am here");
@@ -625,8 +629,11 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                         just_up_receive_buffer[3],
                     ]);
                     //current_server=1-current_server;
-                    if (just_slept > 90) {
+                    if (just_slept > 4) {
                         just_slept = 4;
+                    }
+                    if (just_slept > 380) {
+                        just_slept = 5;
                     }
                     println!("Current Server Down {}", current_server);
                     println!("I am here");
@@ -854,6 +861,8 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
             println!("Just chill bara");
             current_packet = 0;
             my_load = "".to_string();
+            receive_buffer=[0;BUFFER_SIZE];
+
         } else {
             let (ack_bytes_received, server_caddress) = server_socket
                 .recv_from(&mut receive_buffer)
@@ -910,8 +919,11 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                     just_up_receive_buffer[3],
                 ]);
                 //current_server=1-current_server;
-                if (just_slept > 90) {
+                if (just_slept > 4) {
                     just_slept = 4;
+                }
+                if (just_slept > 380) {
+                    just_slept = 5;
                 }
                 println!("Current Server Down {}", current_server);
                 println!("I am here");

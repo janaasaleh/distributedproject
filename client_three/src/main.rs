@@ -84,7 +84,7 @@ async fn middleware_task(middleware_socket: UdpSocket) {
                     .expect("Failed to send data to server");
             }
             shift_left(&mut buffer, _bytes_received);
-            let timeout_duration = Duration::from_secs(60);
+            let timeout_duration = Duration::from_secs(35);
             match timeout(
                 timeout_duration,
                 middleware_socket.recv_from(&mut ack_buffer),
@@ -100,13 +100,13 @@ async fn middleware_task(middleware_socket: UdpSocket) {
                     shift_left(&mut ack_buffer, ack_bytes_received);
                 }
                 Err(_) => {
-                    //println!("Time 5eles");
-                    //let code_zero = "AA".to_string();
-                    //middleware_socket
-                    //    .send_to(code_zero.as_bytes(), client_address)
-                    //    .await
-                    //    .expect("Failed to send acknowledgment to client");
-                    // code_zero = "AA".to_string();
+                    println!("Time 5eles");
+                    let mut code_zero = "AA".to_string();
+                    middleware_socket
+                        .send_to(code_zero.as_bytes(), client_address)
+                        .await
+                        .expect("Failed to send acknowledgment to client");
+                     code_zero = "AA".to_string();
                 }
                 Ok(Err(_e)) => {}
             }
@@ -228,7 +228,8 @@ async fn main() {
                                                       //sleep(Duration::from_millis(5000)).await;
 
             let packet_number = (image_data.len() / MAX_CHUNCK) + 1;
-            for (index, piece) in image_data.chunks(MAX_CHUNCK).enumerate() {
+            let mut s="".to_string();
+             for (index, piece) in image_data.chunks(MAX_CHUNCK).enumerate() {
                 let is_last_piece = index == packet_number - 1;
                 let chunk = Chunk {
                     total_packet_number: packet_number,
@@ -243,22 +244,41 @@ async fn main() {
                         packet_array
                     },
                 };
+        
                 let serialized = serde_json::to_string(&chunk).unwrap();
-
+                if(s!="")
+                {
+                    println!("Index as a result of repeating {}",index);
+                }
+                loop {
                 client_socket
                     .send_to(&serialized.as_bytes(), middleware_address)
                     .await
                     .expect("Failed to send piece to middleware");
-
-                let (num_bytes_received, _) = client_socket
-                    .recv_from(&mut client_buffer)
-                    .await
-                    .expect("Failed to receive acknowledgement from server");
-                let received_string = String::from_utf8_lossy(&client_buffer[..num_bytes_received]);
-                if received_string.contains("AA") {
-                    println!("Received {}", received_string);
+        
+                
+                    
+                        let (num_bytes_received, _) = client_socket
+                            .recv_from(&mut client_buffer)
+                            .await
+                            .expect("Failed to receive acknowledgement from server");
+        
+                        let received_string = String::from_utf8_lossy(&client_buffer[..num_bytes_received]);
+                        println!("Received {}", received_string);
+        
+                        if received_string.contains("AA") {
+                            println!("Repeating the loop");
+                            s= "Serialized Timeout Wait Pos {}".to_string() + &index.to_string();
+                            //continue 'outer; // Repeat the entire loop
+                        }
+                        else {
+                            break;
+                        }
+        
+                        // Continue processing if needed
+                        //break; // Break out of the inner loop
                 }
-                println!("Received {}", received_string);
+                
             }
             println!("Finished All Packets");
             println!("{}", packet_number);
