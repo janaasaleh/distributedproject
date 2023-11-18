@@ -54,8 +54,8 @@ fn remove_trailing_zeros(vec: &mut Vec<u8>) {
 }
 
 async fn middleware_task(middleware_socket: UdpSocket) {
-    // let server_addresses = ["127.0.0.2:21112", "127.0.0.3:21111", "127.0.0.4:21113"];
-    let server_addresses = ["127.0.0.2:21112"];
+    let server_addresses = ["127.0.0.2:21112", "127.0.0.3:21111", "127.0.0.4:21113"];
+    //let server_addresses = ["127.0.0.2:21112"];
     let mut buffer = [0; BUFFER_SIZE];
     let mut ack_buffer = [0; BUFFER_SIZE];
     //let middleware_address: SocketAddr = "127.0.0.8:12345".parse().expect("Failed to parse middleware address");
@@ -84,7 +84,7 @@ async fn middleware_task(middleware_socket: UdpSocket) {
                     .expect("Failed to send data to server");
             }
             shift_left(&mut buffer, _bytes_received);
-            let timeout_duration = Duration::from_secs(12);
+            let timeout_duration = Duration::from_secs(60);
             match timeout(
                 timeout_duration,
                 middleware_socket.recv_from(&mut ack_buffer),
@@ -100,11 +100,12 @@ async fn middleware_task(middleware_socket: UdpSocket) {
                     shift_left(&mut ack_buffer, ack_bytes_received);
                 }
                 Err(_) => {
-                    // code_zero = "".to_string();
-                    // middleware_socket
-                    //     .send_to(code_zero.as_bytes(), client_address)
-                    //     .await
-                    //     .expect("Failed to send acknowledgment to client");
+                    //println!("Time 5eles");
+                    //let code_zero = "AA".to_string();
+                    //middleware_socket
+                    //    .send_to(code_zero.as_bytes(), client_address)
+                    //    .await
+                    //    .expect("Failed to send acknowledgment to client");
                     // code_zero = "AA".to_string();
                 }
                 Ok(Err(_e)) => {}
@@ -249,15 +250,15 @@ async fn main() {
                     .await
                     .expect("Failed to send piece to middleware");
 
-                if index != packet_number - 1 {
-                    let (num_bytes_received, _) = client_socket
-                        .recv_from(&mut client_buffer)
-                        .await
-                        .expect("Failed to receive acknowledgement from server");
-                    let received_string =
-                        String::from_utf8_lossy(&client_buffer[..num_bytes_received]);
+                let (num_bytes_received, _) = client_socket
+                    .recv_from(&mut client_buffer)
+                    .await
+                    .expect("Failed to receive acknowledgement from server");
+                let received_string = String::from_utf8_lossy(&client_buffer[..num_bytes_received]);
+                if received_string.contains("AA") {
                     println!("Received {}", received_string);
                 }
+                println!("Received {}", received_string);
             }
             println!("Finished All Packets");
             println!("{}", packet_number);
