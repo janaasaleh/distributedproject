@@ -86,7 +86,7 @@ async fn middleware_task(middleware_socket: UdpSocket) {
                     .expect("Failed to send data to server");
             }
                 shift_left(&mut buffer, _bytes_received);
-                let timeout_duration = Duration::from_secs(12);
+                let timeout_duration = Duration::from_secs(4);
                 match timeout(
                     timeout_duration,
                     middleware_socket.recv_from(&mut ack_buffer),
