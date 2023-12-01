@@ -455,7 +455,11 @@ async fn main() {
                 let image_path = Path::new(selected_file);
                 if let Ok(_image) = image::open(image_path) {
                     println!("Viewing image: {}", selected_file.to_string_lossy());
-                    let _ = open::that(image_path);
+                    if let Ok(_) = open::that(image_path) {
+                        println!("Opened Image");
+                    } else {
+                        println!("Failed to Open");
+                    }
                 } else {
                     println!("Failed to open image: {}", selected_file.to_string_lossy());
                 }
