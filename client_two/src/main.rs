@@ -1,9 +1,11 @@
 use async_std::net::UdpSocket;
-use image::GenericImageView;
+use image::{DynamicImage, GenericImageView};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
+use std::io;
 use std::net::SocketAddr;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use steganography::decoder::*;
@@ -52,6 +54,12 @@ fn remove_trailing_zeros(vec: &mut Vec<u8>) {
         }
     }
 }
+#[derive(Debug, Deserialize)]
+struct User {
+    address: String,
+    name: String,
+    user_type: String,
+}
 
 async fn middleware_task(middleware_socket: UdpSocket) {
     let server_addresses = ["127.0.0.2:21112", "127.0.0.3:21111", "127.0.0.4:21113"];
@@ -65,26 +73,39 @@ async fn middleware_task(middleware_socket: UdpSocket) {
     // code_zero = "AA".to_string();
     let mut var = 0;
     let mut serverar = 0;
+    let _server_socket = UdpSocket::bind("127.0.0.9:0")
+        .await
+        .expect("Failed to bind server socket");
+    let mut current_server = "".to_string();
 
     while let Ok((_bytes_received, client_address)) = middleware_socket.recv_from(&mut buffer).await
     {
         var += 1;
         if client_address.ip().to_string() == "127.0.0.9" {
             println!("Client:{}", var);
-            let _server_socket = UdpSocket::bind("127.0.0.9:0")
-                .await
-                .expect("Failed to bind server socket");
-            for server_address in &server_addresses {
-                let server_address: SocketAddr = server_address
+            let packet_string = String::from_utf8_lossy(&buffer[0.._bytes_received]);
+            let deserialized: Chunk = serde_json::from_str(&packet_string).unwrap();
+            if deserialized.position == 0 {
+                for server_address in &server_addresses {
+                    let server_address: SocketAddr = server_address
+                        .parse()
+                        .expect("Failed to parse server address");
+                    middleware_socket
+                        .send_to(&buffer[0.._bytes_received], &server_address)
+                        .await
+                        .expect("Failed to send data to server");
+                }
+            } else {
+                let server_address: SocketAddr = current_server
                     .parse()
                     .expect("Failed to parse server address");
                 middleware_socket
-                    .send_to(&buffer[0.._bytes_received], &server_address)
+                    .send_to(&buffer[0.._bytes_received], server_address)
                     .await
                     .expect("Failed to send data to server");
             }
             shift_left(&mut buffer, _bytes_received);
-            let timeout_duration = Duration::from_secs(35);
+            let timeout_duration = Duration::from_secs(120);
             match timeout(
                 timeout_duration,
                 middleware_socket.recv_from(&mut ack_buffer),
@@ -98,15 +119,15 @@ async fn middleware_task(middleware_socket: UdpSocket) {
                         .await
                         .expect("Failed to send acknowledgment to client");
                     shift_left(&mut ack_buffer, ack_bytes_received);
+                    current_server = _server_address.to_string();
                 }
                 Err(_) => {
-                    println!("Time 5eles");
-                    let mut code_zero = "AA".to_string();
-                    middleware_socket
-                        .send_to(code_zero.as_bytes(), client_address)
-                        .await
-                        .expect("Failed to send acknowledgment to client");
-                    code_zero = "AA".to_string();
+                    // code_zero = "".to_string();
+                    // middleware_socket
+                    //     .send_to(code_zero.as_bytes(), client_address)
+                    //     .await
+                    //     .expect("Failed to send acknowledgment to client");
+                    // code_zero = "AA".to_string();
                 }
                 Ok(Err(_e)) => {}
             }
@@ -134,61 +155,118 @@ async fn middleware_task(middleware_socket: UdpSocket) {
     }
 }
 
-// async fn register_user(
-//     client_socket: UdpSocket,
-//     dos_address: &str,
-//     username: &str,
-//     usertype: &str,
-// ) {
-//     let registration_message = format!("REGISTER:{}:{}", username, usertype);
-//     client_socket
-//         .send_to(registration_message.as_bytes(), dos_address)
-//         .await
-//         .expect("Failed to send registration request");
-//     let mut response_buffer = [0; BUFFER_SIZE];
-//     let (bytes_received, _dos_address) = client_socket
-//         .recv_from(&mut response_buffer)
-//         .await
-//         .expect("Failed to receive response");
-//     let response = String::from_utf8_lossy(&response_buffer[..bytes_received]);
-//     println!("Registration response: {}", response);
-// }
+async fn register_user(client_socket: UdpSocket, username: &str, usertype: &str) {
+    let server_addresses = ["127.0.0.2:21112", "127.0.0.3:21111", "127.0.0.4:21113"];
+    let registration_message = format!("REGISTER:{}:{}", username, usertype);
+    for server_address in &server_addresses {
+        client_socket
+            .send_to(registration_message.as_bytes(), server_address)
+            .await
+            .expect("Failed to send registration request");
+    }
+    let mut response_buffer = [0; BUFFER_SIZE];
+    //let (bytes_received, _dos_address) = client_socket
+    //    .recv_from(&mut response_buffer)
+    //    .await
+    //    .expect("Failed to receive response");
+    //let response = String::from_utf8_lossy(&response_buffer[..bytes_received]);
+    //println!("Registration response: {}", response);
+}
+async fn query_online_users(client_socket: UdpSocket) {
+    // Send a query message to request the list of online users
+    let server_addresses = ["127.0.0.2:21112", "127.0.0.3:21111", "127.0.0.4:21113"];
+    for server_address in &server_addresses {
+        client_socket
+            .send_to("QUERY".as_bytes(), server_address)
+            .await
+            .expect("Failed to send query request");
+    }
+    let mut response_buffer = [0; BUFFER_SIZE];
+    let (bytes_received, _middleware_address) = client_socket
+        .recv_from(&mut response_buffer)
+        .await
+        .expect("Failed to receive response");
+    let response = String::from_utf8_lossy(&response_buffer[..bytes_received]);
+    println!("Online users: {}", response);
+}
 
-// async fn query_online_users(client_socket: UdpSocket, middleware_address: &str) {
-//     // Send a query message to request the list of online users
-//     client_socket
-//         .send_to("QUERY".as_bytes(), middleware_address)
-//         .await
-//         .expect("Failed to send query request");
-//     let mut response_buffer = [0; BUFFER_SIZE];
-//     let (bytes_received, _middleware_address) = client_socket
-//         .recv_from(&mut response_buffer)
-//         .await
-//         .expect("Failed to receive response");
-//     let response = String::from_utf8_lossy(&response_buffer[..bytes_received]);
-//     println!("Online users: {}", response);
-// }
+async fn query_online_users_to_send(
+    client_socket: UdpSocket,
+    username: String,
+) -> std::string::String {
+    // Send a query message to request the list of online users
+    let server_addresses = ["127.0.0.2:21112", "127.0.0.3:21111", "127.0.0.4:21113"];
+    let mut sender_address = "".to_string();
+    for server_address in &server_addresses {
+        client_socket
+            .send_to("QUERY2".as_bytes(), server_address)
+            .await
+            .expect("Failed to send query request");
+    }
+    let mut response_buffer = [0; BUFFER_SIZE];
+    let (bytes_received, _middleware_address) = client_socket
+        .recv_from(&mut response_buffer)
+        .await
+        .expect("Failed to receive response");
+    let users: Vec<User> = serde_json::from_slice(&response_buffer[..bytes_received])
+        .expect("Failed to deserialize users");
+
+    // Filter users based on the username condition
+    let filtered_users: Vec<_> = users.iter().filter(|user| user.name != username).collect();
+
+    // Display enumerated names of filtered users
+    for (index, user) in filtered_users.iter().enumerate() {
+        println!("{}: {}", index + 1, user.name);
+    }
+
+    // Ask the user to choose an option
+    println!("Choose a user by entering its number:");
+    let mut input = String::new();
+    io::stdin()
+        .read_line(&mut input)
+        .expect("Failed to read line");
+    let chosen_index: usize = input.trim().parse().expect("Invalid input");
+
+    // Check if the index is valid
+    if chosen_index > 0 && chosen_index <= filtered_users.len() {
+        // Construct the target address
+        let chosen_user = &filtered_users[chosen_index - 1];
+        sender_address = format!("{}:12345", chosen_user.address);
+        //let target_address: SocketAddr = format!("{}:12345", chosen_user.address)
+        //    .parse()
+        //    .expect("Failed to parse target address");
+        // Send a message to the chosen user
+        //let message = "Hello, chosen user!";
+        //client_socket
+        //    .send_to(message.as_bytes(), &target_address)
+        //    .await
+        //    .expect("Failed to send message");
+    } else {
+        println!("Invalid index. Please provide a valid number.");
+    }
+
+    return sender_address;
+}
 
 #[tokio::main]
 async fn main() {
-    let dos_address = "127.0.0.255:12345";
     let middleware_address: SocketAddr = "127.0.0.9:12345"
         .parse()
         .expect("Failed to parse middleware address");
     let client_socket = UdpSocket::bind("127.0.0.9:3411")
         .await
         .expect("Failed to bind client socket");
-    //let client_socket_register = UdpSocket::bind("127.0.0.9:8090").await.expect("Failed to bind client socket");
-    //let client_socket_query = UdpSocket::bind("127.0.0.9:8091").await.expect("Failed to bind client socket");
-    //register_user(client_socket_register,dos_address, "Client1","Client").await;
+    let client_socket_register = UdpSocket::bind("127.0.0.9:8090")
+        .await
+        .expect("Failed to bind client socket");
+    let my_username = "Client2".to_string();
+    register_user(client_socket_register, &my_username, "Client").await;
     //println!("Finished Registry");
-    //query_online_users(client_socket_query,dos_address).await;
     let middleware_socket = UdpSocket::bind(&middleware_address)
         .await
         .expect("Failed to bind middleware socket");
 
     tokio::spawn(middleware_task(middleware_socket));
-    let _dos_address_clone = dos_address; // Assuming `dos_address` is defined elsewhere
     let termination = Arc::new(Mutex::new(0));
     let termination_clone = Arc::clone(&termination);
 
@@ -196,14 +274,18 @@ async fn main() {
     tokio::spawn(async move {
         signal.recv().await;
         println!("Received termination signal");
+        let server_addresses = ["127.0.0.2:21112", "127.0.0.3:21111", "127.0.0.4:21113"];
 
-        //let unregister_message = "UNREGISTER";
-        //let dos_socket = UdpSocket::bind("127.0.0.9:9000").await.expect("Failed to bind socket");
-        //dos_socket
-        //    .send_to(unregister_message.as_bytes(), dos_address_clone)
-        //    .await
-        //    .expect("Failed to send unregister message");
-        //
+        let unregister_message = "UNREGISTER";
+        let dos_socket = UdpSocket::bind("127.0.0.9:9000")
+            .await
+            .expect("Failed to bind socket");
+        for server_address in &server_addresses {
+            dos_socket
+                .send_to(unregister_message.as_bytes(), server_address)
+                .await
+                .expect("Failed to send unregister message");
+        }
         // Notify other tasks waiting for the signal
         //let _ = tx.send(());
         *termination_clone.lock().unwrap() = 1;
@@ -214,22 +296,25 @@ async fn main() {
     });
 
     while *termination.lock().unwrap() == 0 {
-        println!("Press Enter to send a Request");
+        println!("Type a Number to undergo on of the following:");
+        println!("1. View a Picture");
+        println!("2. Encrypt an Image");
+        println!("3. View Online Users");
+        println!("4. Send an Image to a Client");
         let mut input = String::new();
         std::io::stdin()
             .read_line(&mut input)
             .expect("Failed to read line");
-        if input.trim() == "" {
+        if input.trim() == "2" {
             let mut client_buffer = [0; BUFFER_SIZE];
 
             println!("Sending Image");
             let image_data = fs::read("image.png").expect("Failed to read the image file");
-            let middleware_address = "0.0.0.0:12345"; // Replace with the actual middleware address and port
-                                                      //sleep(Duration::from_millis(5000)).await;
+            let middleware_address = "127.0.0.9:12345"; // Replace with the actual middleware address and port
+                                                        //sleep(Duration::from_millis(5000)).await;
 
             let packet_number = (image_data.len() / MAX_CHUNCK) + 1;
-            let mut s="".to_string();
-             for (index, piece) in image_data.chunks(MAX_CHUNCK).enumerate() {
+            for (index, piece) in image_data.chunks(MAX_CHUNCK).enumerate() {
                 let is_last_piece = index == packet_number - 1;
                 let chunk = Chunk {
                     total_packet_number: packet_number,
@@ -244,41 +329,20 @@ async fn main() {
                         packet_array
                     },
                 };
-        
+                println!("Index:{}", index);
                 let serialized = serde_json::to_string(&chunk).unwrap();
-                if(s!="")
-                {
-                    println!("Index as a result of repeating {}",index);
-                }
-                loop {
+
                 client_socket
                     .send_to(&serialized.as_bytes(), middleware_address)
                     .await
                     .expect("Failed to send piece to middleware");
-        
-                
-                    
-                        let (num_bytes_received, _) = client_socket
-                            .recv_from(&mut client_buffer)
-                            .await
-                            .expect("Failed to receive acknowledgement from server");
-        
-                        let received_string = String::from_utf8_lossy(&client_buffer[..num_bytes_received]);
-                        println!("Received {}", received_string);
-        
-                        if received_string.contains("AA") {
-                            println!("Repeating the loop");
-                            s= "Serialized Timeout Wait Pos {}".to_string() + &index.to_string();
-                            //continue 'outer; // Repeat the entire loop
-                        }
-                        else {
-                            break;
-                        }
-        
-                        // Continue processing if needed
-                        //break; // Break out of the inner loop
-                }
-                
+
+                let (num_bytes_received, _) = client_socket
+                    .recv_from(&mut client_buffer)
+                    .await
+                    .expect("Failed to receive acknowledgement from server");
+                let received_string = String::from_utf8_lossy(&client_buffer[..num_bytes_received]);
+                println!("Received {}", received_string);
             }
             println!("Finished All Packets");
             println!("{}", packet_number);
@@ -289,6 +353,7 @@ async fn main() {
             let mut enecrypted_image_packet_number = packet_number;
 
             while j < enecrypted_image_packet_number {
+                println!("j : {}  EIPN: {}", j, enecrypted_image_packet_number);
                 if let Ok((_bytes_received, _client_address)) =
                     client_socket.recv_from(&mut client_buffer).await
                 {
@@ -296,7 +361,7 @@ async fn main() {
                     let deserialized: Chunk = serde_json::from_str(&packet_string).unwrap();
                     enecrypted_image_packet_number = deserialized.total_packet_number;
                     let mio = deserialized.position;
-                    println!("EIPN {}", mio);
+                    //println!("EIPN {}",mio);
                     shift_left(&mut client_buffer, _bytes_received);
                     if j == enecrypted_image_packet_number - 1 {
                         image_chunks.insert(
@@ -357,6 +422,62 @@ async fn main() {
             } else {
                 println!("Failed to create image from byte stream");
             }
+        } else if (input.trim() == "3") {
+            let client_socket_query = UdpSocket::bind("127.0.0.9:8091")
+                .await
+                .expect("Failed to bind client socket");
+            query_online_users(client_socket_query).await;
+        } else if (input.trim() == "1") {
+            let png_files: Vec<_> = fs::read_dir(".")
+                .expect("Failed to read directory")
+                .filter_map(|entry| {
+                    entry.ok().and_then(|e| {
+                        if e.path().extension().and_then(|e| e.to_str()) == Some("png") {
+                            Some(e.file_name())
+                        } else {
+                            None
+                        }
+                    })
+                })
+                .collect();
+
+            // Display enumerated PNG file names
+            for (index, file_name) in png_files.iter().enumerate() {
+                println!("{}: {}", index + 1, file_name.to_string_lossy());
+            }
+
+            // Ask the user to input a number
+            println!("Type the number of the image you want to view:");
+            let mut input = String::new();
+            io::stdin()
+                .read_line(&mut input)
+                .expect("Failed to read line");
+
+            // Parse the user input as an index
+            let index: usize = input.trim().parse().expect("Invalid input");
+
+            // Check if the index is valid
+            if index > 0 && index <= png_files.len() {
+                // Load and display the selected image
+                let selected_file = &png_files[index - 1];
+                let image_path = Path::new(selected_file);
+                if let Ok(image) = image::open(image_path) {
+                    println!("Viewing image: {}", selected_file.to_string_lossy());
+                    open::that(image_path);
+                } else {
+                    println!("Failed to open image: {}", selected_file.to_string_lossy());
+                }
+            } else {
+                println!("Invalid index. Please provide a valid number.");
+            }
+        } else if (input.trim() == "4") {
+            let client_socket_query = UdpSocket::bind("127.0.0.9:8091")
+                .await
+                .expect("Failed to bind client socket");
+            let mut peer_address = "".to_string();
+            peer_address =
+                query_online_users_to_send(client_socket_query, "Client2".to_string()).await;
+            println!("{}", peer_address);
         }
     }
 }
