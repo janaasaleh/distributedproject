@@ -1,5 +1,5 @@
 use async_std::net::UdpSocket;
-use image::{DynamicImage, GenericImageView};
+use image::GenericImageView;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
@@ -453,10 +453,9 @@ async fn main() {
                 // Load and display the selected image
                 let selected_file = &png_files[index - 1];
                 let image_path = Path::new(selected_file);
-                println!("{:?}", image_path);
                 if let Ok(_image) = image::open(image_path) {
                     println!("Viewing image: {}", selected_file.to_string_lossy());
-                    let _ = open::with(image_path, "Image Viewer");
+                    let _ = open::that(image_path);
                 } else {
                     println!("Failed to open image: {}", selected_file.to_string_lossy());
                 }
