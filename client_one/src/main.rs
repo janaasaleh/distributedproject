@@ -8,8 +8,6 @@ use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use steganography::decoder::*;
-use steganography::util::*;
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::time::{sleep, timeout};
 
@@ -18,11 +16,13 @@ use big_array::BigArray;
 
 const BUFFER_SIZE: usize = 65536;
 const MAX_CHUNCK: usize = 16384;
+static mut VIEWS: u8 = 10;
 
 type PacketArray = [u8; MAX_CHUNCK];
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Chunk {
+    views: u8,
     total_packet_number: usize,
     position: i16,
     #[serde(with = "BigArray")]
@@ -300,6 +300,29 @@ async fn main() {
             .expect("Failed to read line");
         if input.trim() == "2" {
             let mut client_buffer = [0; BUFFER_SIZE];
+            loop {
+                println!("Enter a number between 1-255 for views");
+                let mut input = String::new();
+
+                std::io::stdin()
+                    .read_line(&mut input)
+                    .expect("Failed to read line");
+
+                match input.trim().parse::<u8>() {
+                    Ok(parsed_num) => {
+                        // Check if the parsed number is less than 255
+                        if parsed_num < 255 && parsed_num > 0 {
+                            unsafe { VIEWS = parsed_num };
+                            break;
+                        } else {
+                            println!("Input is not in the range of 1-255: {}", parsed_num);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Error parsing input as u8: {}", e);
+                    }
+                }
+            }
 
             println!("Sending Image");
             let image_data = fs::read("image.png").expect("Failed to read the image file");
@@ -310,6 +333,7 @@ async fn main() {
             for (index, piece) in image_data.chunks(MAX_CHUNCK).enumerate() {
                 let is_last_piece = index == packet_number - 1;
                 let chunk = Chunk {
+                    views: unsafe { VIEWS },
                     total_packet_number: packet_number,
                     position: if is_last_piece {
                         -1
@@ -391,29 +415,29 @@ async fn main() {
                 println!("Failed to create image from byte stream");
             }
 
-            let encoded_image = file_as_image_buffer("encrypted.png".to_string());
-            let dec = Decoder::new(encoded_image);
-            let out_buffer = dec.decode_alpha();
-            let clean_buffer: Vec<u8> = out_buffer.into_iter().filter(|b| *b != 0xff_u8).collect();
-            let message = bytes_to_str(clean_buffer.as_slice());
+            // let encoded_image = file_as_image_buffer("encrypted.png".to_string());
+            // let dec = Decoder::new(encoded_image);
+            // let out_buffer = dec.decode_alpha();
+            // let clean_buffer: Vec<u8> = out_buffer.into_iter().filter(|b| *b != 0xff_u8).collect();
+            // let message = bytes_to_str(clean_buffer.as_slice());
 
-            let decoded_image_data = base64::decode(message).unwrap_or_else(|e| {
-                eprintln!("Error decoding base64: {}", e);
-                Vec::new()
-            });
+            // let decoded_image_data = base64::decode(message).unwrap_or_else(|e| {
+            //     eprintln!("Error decoding base64: {}", e);
+            //     Vec::new()
+            // });
 
-            if let Ok(decoded_image) = image::load_from_memory(&decoded_image_data) {
-                let (width, height) = decoded_image.dimensions();
-                println!("Image dimensions: {} x {}", width, height);
+            // if let Ok(decoded_image) = image::load_from_memory(&decoded_image_data) {
+            //     let (width, height) = decoded_image.dimensions();
+            //     println!("Image dimensions: {} x {}", width, height);
 
-                if let Err(err) = decoded_image.save("decoded.png") {
-                    eprintln!("Failed to save the image: {}", err);
-                } else {
-                    println!("Image saved successfully");
-                }
-            } else {
-                println!("Failed to create image from byte stream");
-            }
+            //     if let Err(err) = decoded_image.save("decoded.png") {
+            //         eprintln!("Failed to save the image: {}", err);
+            //     } else {
+            //         println!("Image saved successfully");
+            //     }
+            // } else {
+            //     println!("Failed to create image from byte stream");
+            // }
         } else if input.trim() == "3" {
             let client_socket_query = UdpSocket::bind("127.0.0.8:8091")
                 .await
@@ -470,10 +494,49 @@ async fn main() {
             let client_socket_query = UdpSocket::bind("127.0.0.8:8091")
                 .await
                 .expect("Failed to bind client socket");
-            let mut peer_address = "".to_string();
-            peer_address =
+            let peer_address =
                 query_online_users_to_send(client_socket_query, "Client1".to_string()).await;
             println!("{}", peer_address);
+
+            if let Ok(image_data) = fs::read("encrypted.png") {
+                let mut client_buffer = [0; BUFFER_SIZE];
+                let packet_number = (image_data.len() / MAX_CHUNCK) + 1;
+                for (index, piece) in image_data.chunks(MAX_CHUNCK).enumerate() {
+                    let is_last_piece = index == packet_number - 1;
+                    let chunk = Chunk {
+                        views: unsafe { VIEWS },
+                        total_packet_number: packet_number,
+                        position: if is_last_piece {
+                            -1
+                        } else {
+                            index.try_into().unwrap()
+                        },
+                        packet: {
+                            let mut packet_array = [0; MAX_CHUNCK];
+                            packet_array[..piece.len()].copy_from_slice(piece);
+                            packet_array
+                        },
+                    };
+                    println!("Index:{}", index);
+                    let serialized = serde_json::to_string(&chunk).unwrap();
+
+                    client_socket
+                        .send_to(&serialized.as_bytes(), peer_address.clone())
+                        .await
+                        .expect("Failed to send to peer");
+                    let (num_bytes_received, _) = client_socket
+                        .recv_from(&mut client_buffer)
+                        .await
+                        .expect("Failed to receive acknowledgement from server");
+                    let received_string =
+                        String::from_utf8_lossy(&client_buffer[..num_bytes_received]);
+                    println!("Received {}", received_string);
+                }
+                println!("Finished All Packets");
+                println!("{}", packet_number);
+            } else {
+                println!("You Should Encrypt the image first!");
+            }
         }
     }
 }

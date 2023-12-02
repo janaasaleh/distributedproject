@@ -18,6 +18,7 @@ type PacketArray = [u8; MAX_CHUNCK];
 #[derive(Serialize, Deserialize, Debug)]
 
 struct Chunk {
+    views: i8,
     total_packet_number: usize,
     position: i16,
     #[serde(with = "BigArray")]
