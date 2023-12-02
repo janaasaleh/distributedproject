@@ -535,7 +535,7 @@ async fn main() {
                 println!("Finished All Packets");
                 println!("{}", packet_number);
             } else {
-                println!("You Should Encrypt the image first!");
+                println!("Encrypt the image first!");
             }
         }
     }
