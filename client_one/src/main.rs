@@ -47,6 +47,13 @@ fn shift_left(array: &mut [u8; BUFFER_SIZE], positions: usize) {
     }
 }
 
+fn delete_image(file_path: &str) {
+    match fs::remove_file(file_path) {
+        Ok(_) => println!("Image deleted successfully."),
+        Err(err) => eprintln!("Error deleting image: {}", err),
+    }
+}
+
 fn remove_trailing_zeros(vec: &mut Vec<u8>) {
     while let Some(&last_element) = vec.last() {
         if last_element == 0 {
@@ -433,7 +440,7 @@ async fn query_online_users_to_send(
     if chosen_index > 0 && chosen_index <= filtered_users.len() {
         // Construct the target address
         let chosen_user = &filtered_users[chosen_index - 1];
-        sender_address = format!("{}:12345", chosen_user.address);
+        sender_address = format!("{}:8085", chosen_user.address);
         //let target_address: SocketAddr = format!("{}:12345", chosen_user.address)
         //    .parse()
         //    .expect("Failed to parse target address");
@@ -473,9 +480,8 @@ async fn main() {
     let client_listener_socket = UdpSocket::bind(&client_listener_address)
         .await
         .expect("Failed to bind middleware socket");
-    let server_middleware_task = middleware_task(middleware_socket);
-    let client_listener_task = client_listener(client_listener_socket);
-    let _ = tokio::join!(client_listener_task, server_middleware_task);
+    tokio::spawn(middleware_task(middleware_socket));
+    tokio::spawn(client_listener(client_listener_socket));
     let termination = Arc::new(Mutex::new(0));
     let termination_clone = Arc::clone(&termination);
 
@@ -719,46 +725,180 @@ async fn main() {
             let peer_address =
                 query_online_users_to_send(client_socket_query, "Client1".to_string()).await;
             println!("{}", peer_address);
-
-            if let Ok(image_data) = fs::read("encrypted.png") {
-                let mut client_buffer = [0; BUFFER_SIZE];
-                let packet_number = (image_data.len() / MAX_CHUNCK) + 1;
-                for (index, piece) in image_data.chunks(MAX_CHUNCK).enumerate() {
-                    let is_last_piece = index == packet_number - 1;
-                    let chunk = Chunk {
-                        views: unsafe { VIEWS },
-                        total_packet_number: packet_number,
-                        position: if is_last_piece {
-                            -1
+            let mut request_buffer=[0;BUFFER_SIZE];
+            let mut small_buffer=[0;8];
+            client_socket
+                        .send_to("I want to request a picture".as_bytes(), peer_address)
+                        .await
+                        .expect("Failed to send");
+            client_socket.recv_from(&mut small_buffer).await.expect("");
+            let mut num_pictures = i32::from_be_bytes([
+                small_buffer[4],
+                small_buffer[5],
+                small_buffer[6],
+                small_buffer[7],
+            ]);
+             println!("Num Pics:{}",num_pictures);
+            let mut i=0;
+            let mut enecrypted_image_packet_number:usize = 1000;
+            let mut encrypted_image_data: Vec<u8> = Vec::new();
+            let mut image_chunks = HashMap::<i16, PacketArray>::new();
+            let mut j = 0;
+            while i<num_pictures
+            {
+                while j < enecrypted_image_packet_number {
+                    println!("j : {}  EIPN: {}", j, enecrypted_image_packet_number);
+                    if let Ok((_bytes_received, _client_address)) =
+                        client_socket.recv_from(&mut request_buffer).await
+                    {
+                        let packet_string = String::from_utf8_lossy(&request_buffer[0.._bytes_received]);
+                        let deserialized: Chunk = serde_json::from_str(&packet_string).unwrap();
+                        enecrypted_image_packet_number = deserialized.total_packet_number;
+                        shift_left(&mut request_buffer, _bytes_received);
+                        if j == enecrypted_image_packet_number - 1 {
+                            image_chunks.insert(
+                                enecrypted_image_packet_number.try_into().unwrap(),
+                                deserialized.packet,
+                            );
+                            println!("Ana 5aragt {}", j);
                         } else {
-                            index.try_into().unwrap()
-                        },
-                        packet: {
-                            let mut packet_array = [0; MAX_CHUNCK];
-                            packet_array[..piece.len()].copy_from_slice(piece);
-                            packet_array
-                        },
-                    };
-                    println!("Index:{}", index);
-                    let serialized = serde_json::to_string(&chunk).unwrap();
+                            image_chunks.insert(deserialized.position, deserialized.packet);
+                        }
+                        j += 1;
+                        client_socket
+                        .send_to("Ack".as_bytes(), _client_address)
+                        .await
+                        .expect("Failed to send");
+                    }
+                    }
+                
+                    j=0;
+                    i+=1;
+            
+                let image_chunks_cloned: BTreeMap<_, _> = image_chunks.clone().into_iter().collect();
 
-                    client_socket
-                        .send_to(&serialized.as_bytes(), peer_address.clone())
-                        .await
-                        .expect("Failed to send to peer");
-                    let (num_bytes_received, _) = client_socket
-                        .recv_from(&mut client_buffer)
-                        .await
-                        .expect("Failed to receive acknowledgement from server");
-                    let received_string =
-                        String::from_utf8_lossy(&client_buffer[..num_bytes_received]);
-                    println!("Received {}", received_string);
+                for (_key, value) in image_chunks_cloned {
+                    // println!("Key: {}, Value: {:?}", key, value);
+                    encrypted_image_data.extend_from_slice(&value);
                 }
-                println!("Finished All Packets");
-                println!("{}", packet_number);
-            } else {
-                println!("Encrypt the image first!");
+    
+                remove_trailing_zeros(&mut encrypted_image_data);
+                println!("EID Size {}", encrypted_image_data.len());
+    
+                if let Ok(encrypted_image) = image::load_from_memory(&encrypted_image_data) {
+                    let (width, height) = encrypted_image.dimensions();
+                    println!("Image dimensions: {} x {}", width, height);
+    
+                    if let Err(err) = encrypted_image.save("encrypted.png") {
+                        eprintln!("Failed to save the image: {}", err);
+                    } else {
+                        println!("Image saved successfully");
+                    }
+                } else {
+                    println!("Failed to create image from byte stream");
+                }
+                if let Ok(_image) = image::open("encrypted.png") {
+                    if let Ok(_) = open::that("encrypted.png") {
+                        println!("Opened Image");
+                    } else {
+                        println!("Failed to Open");
+                    }
+                } else {
+                    println!("Failed to open image:");
+                }
+                delete_image("encrypted.png");
             }
+            let (num_bytes_received,client_address) = client_socket.recv_from(&mut request_buffer).await.expect("Failed to receive data");
+
+            // Deserialize the JSON into a vector of strings
+            let png_files: Vec<String> = serde_json::from_slice(&request_buffer[..num_bytes_received])
+                .expect("Failed to deserialize JSON");
+        
+            // Display the list of strings to the user and let them choose
+            println!("Choose a string:");
+            for (index, png_file) in png_files.iter().enumerate() {
+                println!("{}. {}", index + 1, png_file);
+            }
+        
+            // Get user input for the chosen index
+            let mut user_input = String::new();
+            println!("Enter the number of the string you want to choose:");
+            std::io::stdin().read_line(&mut user_input).expect("Failed to read user input");
+        
+            // Parse user input as usize
+            let chosen_index: usize = user_input.trim().parse().expect("Invalid input");
+            let mut chosen_string="".to_string();
+        
+            // Ensure the chosen index is within bounds
+            if chosen_index > 0 && chosen_index <= png_files.len() {
+                // Retrieve the chosen string
+                chosen_string = png_files[chosen_index - 1].to_string();
+                println!("You chose: {}", chosen_string);
+            } else {
+                println!("Invalid choice");
+            }
+            client_socket
+                        .send_to(chosen_string.as_bytes(), client_address)
+                        .await
+                        .expect("Failed to send");
+            let mut user_views = String::new();
+            println!("Enter the number of views you want:");
+            std::io::stdin().read_line(&mut user_views).expect("Failed to read user input");
+            let chosen_views: usize = user_views.trim().parse().expect("Invalid input");
+            let chosen_views_bytes: &[u8] = &chosen_views.to_be_bytes();
+            client_socket
+                        .send_to(chosen_views_bytes, client_address)
+                        .await
+                        .expect("Failed to send");
+            
+            j=0;
+            while j < enecrypted_image_packet_number {
+                if let Ok((_bytes_received, _client_address)) =
+                    client_socket.recv_from(&mut request_buffer).await
+                {
+                    let packet_string = String::from_utf8_lossy(&request_buffer[0.._bytes_received]);
+                    let deserialized: Chunk = serde_json::from_str(&packet_string).unwrap();
+                    enecrypted_image_packet_number = deserialized.total_packet_number;
+                    shift_left(&mut request_buffer, _bytes_received);
+                    if j == enecrypted_image_packet_number - 1 {
+                        image_chunks.insert(
+                            enecrypted_image_packet_number.try_into().unwrap(),
+                            deserialized.packet,
+                        );
+                        println!("Ana 5aragt {}", j);
+                    } else {
+                        image_chunks.insert(deserialized.position, deserialized.packet);
+                    }
+                    j += 1;
+                    client_socket
+                    .send_to("Ack".as_bytes(), _client_address)
+                    .await
+                    .expect("Failed to send");
+                }
+            }
+            let image_chunks_cloned: BTreeMap<_, _> = image_chunks.clone().into_iter().collect();
+
+                for (_key, value) in image_chunks_cloned {
+                    // println!("Key: {}, Value: {:?}", key, value);
+                    encrypted_image_data.extend_from_slice(&value);
+                }
+    
+                remove_trailing_zeros(&mut encrypted_image_data);
+                println!("EID Size {}", encrypted_image_data.len());
+    
+                if let Ok(encrypted_image) = image::load_from_memory(&encrypted_image_data) {
+                    let (width, height) = encrypted_image.dimensions();
+                    println!("Image dimensions: {} x {}", width, height);
+    
+                    if let Err(err) = encrypted_image.save("encrypted.png") {
+                        eprintln!("Failed to save the image: {}", err);
+                    } else {
+                        println!("Image saved successfully");
+                    }
+                } else {
+                    println!("Failed to create image from byte stream");
+                }
+
         }
     }
 }

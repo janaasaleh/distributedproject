@@ -1,1 +1,1 @@
-/home/mahfouz/Desktop/DS/distributedproject/client_two/target/debug/client_two: /home/mahfouz/Desktop/DS/distributedproject/client_two/src/big_array.rs /home/mahfouz/Desktop/DS/distributedproject/client_two/src/main.rs
+/home/doma/AUC/distributed/distributedproject/client_two/target/debug/client_two: /home/doma/AUC/distributed/distributedproject/client_two/src/big_array.rs /home/doma/AUC/distributed/distributedproject/client_two/src/main.rs
