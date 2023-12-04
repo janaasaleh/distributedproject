@@ -1,1 +1,1 @@
-/mnt/Doma/AUC/Distributed\ systems/project/distributedproject/server_one/target/debug/server_one: /mnt/Doma/AUC/Distributed\ systems/project/distributedproject/server_one/src/big_array.rs /mnt/Doma/AUC/Distributed\ systems/project/distributedproject/server_one/src/main.rs
+/home/doma/AUC/distributed/distributedproject/server_one/target/debug/server_one: /home/doma/AUC/distributed/distributedproject/server_one/src/big_array.rs /home/doma/AUC/distributed/distributedproject/server_one/src/main.rs

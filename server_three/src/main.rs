@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::net::SocketAddr;
-use std::time::Duration;
 use steganography::encoder::*;
 use steganography::util::*;
 
@@ -13,17 +12,24 @@ use big_array::BigArray;
 
 const BUFFER_SIZE: usize = 65536;
 const MAX_CHUNCK: usize = 16384;
+static mut VIEWS: i8 = 10;
 
 type PacketArray = [u8; MAX_CHUNCK];
 
 #[derive(Serialize, Deserialize, Debug)]
-
 struct Chunk {
     views: i8,
     total_packet_number: usize,
     position: i16,
     #[serde(with = "BigArray")]
     packet: PacketArray,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct User {
+    address: String,
+    name: String,
+    user_type: String,
 }
 
 fn shift_left(array: &mut [u8; BUFFER_SIZE], positions: usize) {
@@ -50,12 +56,6 @@ fn remove_trailing_zeros(vec: &mut Vec<u8>) {
             break;
         }
     }
-}
-#[derive(Serialize, Deserialize, Debug)]
-struct User {
-    address: String,
-    name: String,
-    user_type: String,
 }
 
 fn extract_ip_address(socket_addr: SocketAddr) -> String {
@@ -102,7 +102,7 @@ async fn server1(server_address: &str, _middleware_address: &str) {
         } else {
             println!("Entered in Server Encryption");
             let mut real_client_address = "".to_string();
-            if let Ok((client_address_bytes_received, client_address)) =
+            if let Ok((client_address_bytes_received, _client_address)) =
                 socket.recv_from(&mut buffer).await
             {
                 real_client_address =
@@ -121,6 +121,10 @@ async fn server1(server_address: &str, _middleware_address: &str) {
 
             remove_trailing_zeros(&mut image_data);
 
+            unsafe { VIEWS = deserialized.views }
+
+            image_data.insert(0, deserialized.views.try_into().unwrap());
+
             let image_string = base64::encode(image_data.clone());
             let payload = str_to_bytes(&image_string);
             let destination_image = file_as_dynamic_image("encrypt.png".to_string());
@@ -138,6 +142,7 @@ async fn server1(server_address: &str, _middleware_address: &str) {
             for (index, piece) in image_data.chunks(MAX_CHUNCK).enumerate() {
                 let is_last_piece = index == packet_number - 1;
                 let chunk = Chunk {
+                    views: unsafe { VIEWS },
                     total_packet_number: packet_number,
                     position: if is_last_piece {
                         -1
@@ -176,11 +181,11 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
     let server_to_server_socket = UdpSocket::bind("127.0.0.4:8080")
         .await
         .expect("Failed to bind server to server socket");
-    let server_load_socket = UdpSocket::bind("127.0.0.4:8100")
+    let _server_load_socket = UdpSocket::bind("127.0.0.4:8100")
         .await
         .expect("Failed to bind server to server socket");
 
-    let mut server_down = 0;
+    let mut _server_down = 0;
     let real_server_down = 0;
     let server_down_index: i32 = 10;
     let server_up_index: i32 = 20;
@@ -290,7 +295,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
             }
         }
 
-        if (my_load != ip_string) {
+        if my_load != ip_string {
             server_to_server_socket
                 .recv_from(&mut server_to_server1_receive_buffer)
                 .await
@@ -317,7 +322,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
         println!("Index recieved {}", index1);
         println!("Index recieved {}", index2);
 
-        if (my_load != ip_string) {
+        if my_load != ip_string {
             if message == "QUERY" && cpu_usage < index1 && cpu_usage < index2 {
                 // Send the list of active users to the requesting client
                 let users_list: String = active_users
@@ -339,7 +344,7 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                     .await
                     .expect("Failed to send active users list");
                 continue;
-            } else if (cpu_usage < index1 && cpu_usage < index2 && my_load == "") {
+            } else if cpu_usage < index1 && cpu_usage < index2 && my_load == "" {
                 my_load = ip_string;
                 let packet_string = String::from_utf8_lossy(&receive_buffer[0..bytes_received]);
                 let deserialized: Chunk = serde_json::from_str(&packet_string).unwrap();
@@ -429,7 +434,7 @@ async fn main() {
     let middleware_address_str = middleware_address.to_string();
 
     // Define the server addresses and middleware addresses
-    let server_addresses = ["127.0.0.2:54321", "127.0.0.3:54322", "127.0.0.4:54323"];
+    let server_addresses = ["127.0.0.4:54321", "127.0.0.3:54322", "127.0.0.4:54323"];
     let server1_task = server1("127.0.0.4:54323", &middleware_address_str);
 
     // Start the server middleware

@@ -1,0 +1,10 @@
+/home/doma/AUC/distributed/distributedproject/server_three/target/debug/deps/libasync_global_executor-bfb4a2e9322192e7.rmeta: /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-global-executor-2.3.1/src/lib.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-global-executor-2.3.1/src/config.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-global-executor-2.3.1/src/executor.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-global-executor-2.3.1/src/init.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-global-executor-2.3.1/src/reactor.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-global-executor-2.3.1/src/threading.rs
+
+/home/doma/AUC/distributed/distributedproject/server_three/target/debug/deps/async_global_executor-bfb4a2e9322192e7.d: /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-global-executor-2.3.1/src/lib.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-global-executor-2.3.1/src/config.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-global-executor-2.3.1/src/executor.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-global-executor-2.3.1/src/init.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-global-executor-2.3.1/src/reactor.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-global-executor-2.3.1/src/threading.rs
+
+/home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-global-executor-2.3.1/src/lib.rs:
+/home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-global-executor-2.3.1/src/config.rs:
+/home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-global-executor-2.3.1/src/executor.rs:
+/home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-global-executor-2.3.1/src/init.rs:
+/home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-global-executor-2.3.1/src/reactor.rs:
+/home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/async-global-executor-2.3.1/src/threading.rs:

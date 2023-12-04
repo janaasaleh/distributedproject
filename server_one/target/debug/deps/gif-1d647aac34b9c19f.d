@@ -1,0 +1,12 @@
+/home/doma/AUC/distributed/distributedproject/server_one/target/debug/deps/libgif-1d647aac34b9c19f.rmeta: /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gif-0.10.3/src/lib.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gif-0.10.3/src/traits.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gif-0.10.3/src/common.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gif-0.10.3/src/reader/mod.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gif-0.10.3/src/reader/decoder.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gif-0.10.3/src/encoder.rs
+
+/home/doma/AUC/distributed/distributedproject/server_one/target/debug/deps/libgif-1d647aac34b9c19f.rlib: /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gif-0.10.3/src/lib.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gif-0.10.3/src/traits.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gif-0.10.3/src/common.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gif-0.10.3/src/reader/mod.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gif-0.10.3/src/reader/decoder.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gif-0.10.3/src/encoder.rs
+
+/home/doma/AUC/distributed/distributedproject/server_one/target/debug/deps/gif-1d647aac34b9c19f.d: /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gif-0.10.3/src/lib.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gif-0.10.3/src/traits.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gif-0.10.3/src/common.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gif-0.10.3/src/reader/mod.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gif-0.10.3/src/reader/decoder.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gif-0.10.3/src/encoder.rs
+
+/home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gif-0.10.3/src/lib.rs:
+/home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gif-0.10.3/src/traits.rs:
+/home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gif-0.10.3/src/common.rs:
+/home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gif-0.10.3/src/reader/mod.rs:
+/home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gif-0.10.3/src/reader/decoder.rs:
+/home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/gif-0.10.3/src/encoder.rs:

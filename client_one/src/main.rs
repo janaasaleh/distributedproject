@@ -3,11 +3,13 @@ use image::GenericImageView;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
-use std::io;
+use std::io::{self, Cursor};
 use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use steganography::decoder::Decoder;
+use steganography::util::*;
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::time::{sleep, timeout};
 
@@ -59,6 +61,209 @@ struct User {
     address: String,
     name: String,
     user_type: String,
+}
+async fn client_listener(client_listener_socket: UdpSocket) {
+    let mut buffer = [0; BUFFER_SIZE];
+    let mut ack_buffer = [0; BUFFER_SIZE];
+    while let Ok((_bytes_received, client_address)) =
+        client_listener_socket.recv_from(&mut buffer).await
+    {
+        let png_files: Vec<String> = fs::read_dir(".")
+            .expect("Failed to read directory")
+            .filter_map(|entry| {
+                entry.ok().and_then(|e| {
+                    if e.path().extension().and_then(|e| e.to_str()) == Some("png") {
+                        Some(e.file_name().to_string_lossy().into_owned())
+                    } else {
+                        None
+                    }
+                })
+            })
+            .collect();
+        client_listener_socket
+            .send_to(&png_files.len().to_be_bytes(), client_address)
+            .await
+            .expect("Failed to send data to server");
+        let mut iterate = 0;
+        while iterate < png_files.len() {
+            let img = image::open(&png_files[iterate]).expect("Failed to open image");
+            let low_res = img.resize(512, 512, image::imageops::FilterType::Nearest);
+
+            // let image_data = fs::read(&png_files[iterate]).expect("Failed to read the image file");
+            let mut image_data = Vec::new();
+            low_res
+                .write_to(
+                    &mut Cursor::new(&mut image_data),
+                    image::ImageOutputFormat::Png,
+                )
+                .expect("Failed to write image to byte steam");
+
+            let packet_number = (image_data.len() / MAX_CHUNCK) + 1;
+            for (index, piece) in image_data.chunks(MAX_CHUNCK).enumerate() {
+                let is_last_piece = index == packet_number - 1;
+                let chunk = Chunk {
+                    views: unsafe { VIEWS },
+                    total_packet_number: packet_number,
+                    position: if is_last_piece {
+                        -1
+                    } else {
+                        index.try_into().unwrap()
+                    },
+                    packet: {
+                        let mut packet_array = [0; MAX_CHUNCK];
+                        packet_array[..piece.len()].copy_from_slice(piece);
+                        packet_array
+                    },
+                };
+                let serialized = serde_json::to_string(&chunk).unwrap();
+                client_listener_socket
+                    .send_to(&serialized.as_bytes(), client_address)
+                    .await
+                    .expect("Failed to send piece to middleware");
+                let (num_bytes_received, _) = client_listener_socket
+                    .recv_from(&mut ack_buffer)
+                    .await
+                    .expect("Failed to receive acknowledgement from server");
+
+                //let received_string = String::from_utf8_lossy(&client_buffer[..num_bytes_received]);
+                //println!("Received {}", received_string);
+            }
+            iterate += 1;
+        }
+        let png_files_json =
+            serde_json::to_vec(&png_files).expect("Failed to serialize png_files to JSON");
+        client_listener_socket
+            .send_to(&png_files_json, client_address)
+            .await
+            .expect("Failed to send piece to client");
+        let (num_bytes_received, _) = client_listener_socket
+            .recv_from(&mut buffer)
+            .await
+            .expect("Failed to receive acknowledgement from server");
+        let filename = String::from_utf8_lossy(&buffer[..num_bytes_received]).to_string();
+        let (num_bytes_received, _) = client_listener_socket
+            .recv_from(&mut buffer)
+            .await
+            .expect("Failed to receive acknowledgement from server");
+        let requested_views = u8::from_be_bytes([buffer[0]]);
+
+        //Start Encryption
+        let image_data = fs::read(filename).expect("Failed to read the image file");
+        let middleware_address = "127.0.0.8:12345"; // Replace with the actual middleware address and port
+                                                    //sleep(Duration::from_millis(5000)).await;
+
+        let packet_number = (image_data.len() / MAX_CHUNCK) + 1;
+        for (index, piece) in image_data.chunks(MAX_CHUNCK).enumerate() {
+            let is_last_piece = index == packet_number - 1;
+            let chunk = Chunk {
+                views: requested_views,
+                total_packet_number: packet_number,
+                position: if is_last_piece {
+                    -1
+                } else {
+                    index.try_into().unwrap()
+                },
+                packet: {
+                    let mut packet_array = [0; MAX_CHUNCK];
+                    packet_array[..piece.len()].copy_from_slice(piece);
+                    packet_array
+                },
+            };
+            println!("Index:{}", index);
+            let serialized = serde_json::to_string(&chunk).unwrap();
+
+            client_listener_socket
+                .send_to(&serialized.as_bytes(), middleware_address)
+                .await
+                .expect("Failed to send piece to middleware");
+
+            let (num_bytes_received, _) = client_listener_socket
+                .recv_from(&mut buffer)
+                .await
+                .expect("Failed to receive acknowledgement from server");
+            let received_string = String::from_utf8_lossy(&buffer[..num_bytes_received]);
+            println!("Received {}", received_string);
+        }
+        println!("Finished All Packets");
+        println!("{}", packet_number);
+
+        let mut encrypted_image_data: Vec<u8> = Vec::new();
+        let mut image_chunks = HashMap::<i16, PacketArray>::new();
+        let mut j = 0;
+        let mut enecrypted_image_packet_number = packet_number;
+
+        while j < enecrypted_image_packet_number {
+            println!("j : {}  EIPN: {}", j, enecrypted_image_packet_number);
+            if let Ok((_bytes_received, _client_address)) =
+                client_listener_socket.recv_from(&mut buffer).await
+            {
+                let packet_string = String::from_utf8_lossy(&buffer[0.._bytes_received]);
+                let deserialized: Chunk = serde_json::from_str(&packet_string).unwrap();
+                enecrypted_image_packet_number = deserialized.total_packet_number;
+                shift_left(&mut buffer, _bytes_received);
+
+                if j == enecrypted_image_packet_number - 1 {
+                    image_chunks.insert(
+                        enecrypted_image_packet_number.try_into().unwrap(),
+                        deserialized.packet,
+                    );
+                    println!("Ana 5aragt {}", j);
+                } else {
+                    image_chunks.insert(deserialized.position, deserialized.packet);
+                }
+                j += 1;
+                client_listener_socket
+                    .send_to("Ack".as_bytes(), _client_address)
+                    .await
+                    .expect("Failed to send");
+            }
+        }
+        println!("Ana 5aragt");
+        let image_chunks_cloned: BTreeMap<_, _> = image_chunks.clone().into_iter().collect();
+
+        for (_key, value) in image_chunks_cloned {
+            // println!("Key: {}, Value: {:?}", key, value);
+            encrypted_image_data.extend_from_slice(&value);
+        }
+
+        remove_trailing_zeros(&mut encrypted_image_data);
+        println!("EID Size {}", encrypted_image_data.len());
+
+        //End of Encryption
+
+        let packet_number = (encrypted_image_data.len() / MAX_CHUNCK) + 1;
+        for (index, piece) in encrypted_image_data.chunks(MAX_CHUNCK).enumerate() {
+            let is_last_piece = index == packet_number - 1;
+            let chunk = Chunk {
+                views: requested_views,
+                total_packet_number: packet_number,
+                position: if is_last_piece {
+                    -1
+                } else {
+                    index.try_into().unwrap()
+                },
+                packet: {
+                    let mut packet_array = [0; MAX_CHUNCK];
+                    packet_array[..piece.len()].copy_from_slice(piece);
+                    packet_array
+                },
+            };
+            println!("Index:{}", index);
+            let serialized = serde_json::to_string(&chunk).unwrap();
+
+            client_listener_socket
+                .send_to(&serialized.as_bytes(), client_address)
+                .await
+                .expect("Failed to send piece to middleware");
+
+            let (num_bytes_received, _) = client_listener_socket
+                .recv_from(&mut buffer)
+                .await
+                .expect("Failed to receive acknowledgement from server");
+            let received_string = String::from_utf8_lossy(&buffer[..num_bytes_received]);
+            println!("Received {}", received_string);
+        }
+    }
 }
 
 async fn middleware_task(middleware_socket: UdpSocket) {
@@ -139,6 +344,10 @@ async fn middleware_task(middleware_socket: UdpSocket) {
                 .send_to(&buffer[0.._bytes_received], my_client_address)
                 .await
                 .expect("Failed to send acknowledgment to client");
+            middleware_socket
+                .recv_from(&mut ack_buffer)
+                .await
+                .expect("Failed");
             middleware_socket
                 .send_to(&buffer[0.._bytes_received], client_address)
                 .await
@@ -246,6 +455,9 @@ async fn main() {
     let middleware_address: SocketAddr = "127.0.0.8:12345"
         .parse()
         .expect("Failed to parse middleware address");
+    let client_listener_address: SocketAddr = "127.0.0.8:8085"
+        .parse()
+        .expect("Failed to parse middleware address");
     let client_socket = UdpSocket::bind("127.0.0.8:3411")
         .await
         .expect("Failed to bind client socket");
@@ -258,8 +470,12 @@ async fn main() {
     let middleware_socket = UdpSocket::bind(&middleware_address)
         .await
         .expect("Failed to bind middleware socket");
-
-    tokio::spawn(middleware_task(middleware_socket));
+    let client_listener_socket = UdpSocket::bind(&client_listener_address)
+        .await
+        .expect("Failed to bind middleware socket");
+    let server_middleware_task = middleware_task(middleware_socket);
+    let client_listener_task = client_listener(client_listener_socket);
+    let _ = tokio::join!(client_listener_task, server_middleware_task);
     let termination = Arc::new(Mutex::new(0));
     let termination_clone = Arc::clone(&termination);
 
@@ -389,6 +605,10 @@ async fn main() {
                         image_chunks.insert(deserialized.position, deserialized.packet);
                     }
                     j += 1;
+                    client_socket
+                        .send_to("Ack".as_bytes(), _client_address)
+                        .await
+                        .expect("Failed to send");
                 }
             }
             println!("Ana 5aragt");
@@ -415,16 +635,18 @@ async fn main() {
                 println!("Failed to create image from byte stream");
             }
 
-            // let encoded_image = file_as_image_buffer("encrypted.png".to_string());
-            // let dec = Decoder::new(encoded_image);
-            // let out_buffer = dec.decode_alpha();
-            // let clean_buffer: Vec<u8> = out_buffer.into_iter().filter(|b| *b != 0xff_u8).collect();
-            // let message = bytes_to_str(clean_buffer.as_slice());
+            let encoded_image = file_as_image_buffer("encrypted.png".to_string());
+            let dec = Decoder::new(encoded_image);
+            let out_buffer = dec.decode_alpha();
+            let clean_buffer: Vec<u8> = out_buffer.into_iter().filter(|b| *b != 0xff_u8).collect();
+            let message = bytes_to_str(clean_buffer.as_slice());
 
-            // let decoded_image_data = base64::decode(message).unwrap_or_else(|e| {
-            //     eprintln!("Error decoding base64: {}", e);
-            //     Vec::new()
-            // });
+            let decoded_image_data = base64::decode(message).unwrap_or_else(|e| {
+                eprintln!("Error decoding base64: {}", e);
+                Vec::new()
+            });
+
+            println!("{}", decoded_image_data[0]);
 
             // if let Ok(decoded_image) = image::load_from_memory(&decoded_image_data) {
             //     let (width, height) = decoded_image.dimensions();

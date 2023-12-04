@@ -1,0 +1,9 @@
+/home/doma/AUC/distributed/distributedproject/server_three/target/debug/deps/libevent_listener-34799d5959094d78.rmeta: /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/event-listener-3.1.0/src/lib.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/event-listener-3.1.0/src/std.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/event-listener-3.1.0/src/notify.rs
+
+/home/doma/AUC/distributed/distributedproject/server_three/target/debug/deps/libevent_listener-34799d5959094d78.rlib: /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/event-listener-3.1.0/src/lib.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/event-listener-3.1.0/src/std.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/event-listener-3.1.0/src/notify.rs
+
+/home/doma/AUC/distributed/distributedproject/server_three/target/debug/deps/event_listener-34799d5959094d78.d: /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/event-listener-3.1.0/src/lib.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/event-listener-3.1.0/src/std.rs /home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/event-listener-3.1.0/src/notify.rs
+
+/home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/event-listener-3.1.0/src/lib.rs:
+/home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/event-listener-3.1.0/src/std.rs:
+/home/doma/.cargo/registry/src/index.crates.io-6f17d22bba15001f/event-listener-3.1.0/src/notify.rs:
