@@ -1,0 +1,11 @@
+C:\Users\janjo\OneDrive\Desktop\distributedproject\DOS\target\debug\deps\libasync_task-8cfb8ad2374352a6.rmeta: C:\Users\janjo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\async-task-4.5.0\src\lib.rs C:\Users\janjo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\async-task-4.5.0\src\header.rs C:\Users\janjo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\async-task-4.5.0\src\raw.rs C:\Users\janjo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\async-task-4.5.0\src\runnable.rs C:\Users\janjo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\async-task-4.5.0\src\state.rs C:\Users\janjo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\async-task-4.5.0\src\task.rs C:\Users\janjo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\async-task-4.5.0\src\utils.rs
+
+C:\Users\janjo\OneDrive\Desktop\distributedproject\DOS\target\debug\deps\async_task-8cfb8ad2374352a6.d: C:\Users\janjo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\async-task-4.5.0\src\lib.rs C:\Users\janjo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\async-task-4.5.0\src\header.rs C:\Users\janjo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\async-task-4.5.0\src\raw.rs C:\Users\janjo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\async-task-4.5.0\src\runnable.rs C:\Users\janjo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\async-task-4.5.0\src\state.rs C:\Users\janjo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\async-task-4.5.0\src\task.rs C:\Users\janjo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\async-task-4.5.0\src\utils.rs
+
+C:\Users\janjo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\async-task-4.5.0\src\lib.rs:
+C:\Users\janjo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\async-task-4.5.0\src\header.rs:
+C:\Users\janjo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\async-task-4.5.0\src\raw.rs:
+C:\Users\janjo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\async-task-4.5.0\src\runnable.rs:
+C:\Users\janjo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\async-task-4.5.0\src\state.rs:
+C:\Users\janjo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\async-task-4.5.0\src\task.rs:
+C:\Users\janjo\.cargo\registry\src\index.crates.io-6f17d22bba15001f\async-task-4.5.0\src\utils.rs:
