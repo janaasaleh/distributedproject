@@ -9,6 +9,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use steganography::decoder::Decoder;
+use steganography::encoder::Encoder;
 use steganography::util::*;
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::time::{sleep, timeout};
@@ -87,16 +88,20 @@ async fn client_listener(client_listener_socket: UdpSocket) {
                 })
             })
             .collect();
-        let png_file_legnth:&[u8]=&png_files.len().to_be_bytes();
-        println!("Len:{:?}",png_file_legnth);
+        let png_file_legnth: &[u8] = &png_files.len().to_be_bytes();
+        println!("Len:{:?}", png_file_legnth);
         client_listener_socket
             .send_to(png_file_legnth, client_address)
             .await
             .expect("Failed to send data to server");
         let mut iterate = 0;
         while iterate < png_files.len() {
-            println!("{}",&png_files[iterate]);
-            let img = image::open(format!("my_images/{}",&png_files[iterate].trim_matches('"'))).expect("Failed to open image");
+            println!("{}", &png_files[iterate]);
+            let img = image::open(format!(
+                "my_images/{}",
+                &png_files[iterate].trim_matches('"')
+            ))
+            .expect("Failed to open image");
             let low_res = img.resize(512, 512, image::imageops::FilterType::Nearest);
 
             // let image_data = fs::read(&png_files[iterate]).expect("Failed to read the image file");
@@ -109,7 +114,7 @@ async fn client_listener(client_listener_socket: UdpSocket) {
                 .expect("Failed to write image to byte steam");
 
             let packet_number = (image_data.len() / MAX_CHUNCK) + 1;
-            println!("Packets:{}",packet_number);
+            println!("Packets:{}", packet_number);
             for (index, piece) in image_data.chunks(MAX_CHUNCK).enumerate() {
                 let is_last_piece = index == packet_number - 1;
                 let chunk = Chunk {
@@ -156,7 +161,7 @@ async fn client_listener(client_listener_socket: UdpSocket) {
             .recv_from(&mut buffer)
             .await
             .expect("Failed to receive acknowledgement from server");
-        let requested_views = u8::from_be_bytes([buffer[0]]);
+        let requested_views = u8::from_be_bytes([buffer[7]]);
 
         //Start Encryption
         let image_data = fs::read(filename).expect("Failed to read the image file");
@@ -276,7 +281,6 @@ async fn client_listener(client_listener_socket: UdpSocket) {
         }
     }
 }
-
 
 async fn middleware_task(middleware_socket: UdpSocket) {
     let server_addresses = ["127.0.0.2:21112", "127.0.0.3:21111", "127.0.0.4:21113"];
@@ -664,7 +668,20 @@ async fn main() {
                 .expect("Failed to bind client socket");
             query_online_users(client_socket_query).await;
         } else if input.trim() == "1" {
-            let png_files: Vec<_> = fs::read_dir("my_images/")
+            if let Ok(metadata) = fs::metadata("other_images/decoded.png") {
+                if metadata.is_file() {
+                    if let Err(err) = fs::remove_file("other_images/decoded.png") {
+                        eprintln!("Error deleting file: {}", err);
+                    } else {
+                        println!("File deleted successfully");
+                    }
+                } else {
+                    println!("The path exists, but it is not a file.");
+                }
+            } else {
+                println!("The file does not exist.");
+            }
+            let png_files: Vec<_> = fs::read_dir("other_images/")
                 .expect("Failed to read directory")
                 .filter_map(|entry| {
                     entry.ok().and_then(|e| {
@@ -696,34 +713,72 @@ async fn main() {
             if index > 0 && index <= png_files.len() {
                 // Load and display the selected image
                 let selected_file = &png_files[index - 1];
-                let path=format!("other_images/{}",selected_file.to_string_lossy().trim_matches('"'));
+                let path = format!(
+                    "other_images/{}",
+                    selected_file.to_string_lossy().trim_matches('"')
+                );
                 let image_path = Path::new(&path);
-                println!("{},{}",path,image_path.to_string_lossy());
+                println!("{},{}", path, image_path.to_string_lossy());
 
-                // let encoded_image = file_as_image_buffer(selected_file);
-                // let dec = Decoder::new(encoded_image);
-                // let out_buffer = dec.decode_alpha();
-                // let clean_buffer: Vec<u8> =
-                //     out_buffer.into_iter().filter(|b| *b != 0xff_u8).collect();
-                // let message = bytes_to_str(clean_buffer.as_slice());
+                let encoded_image = file_as_image_buffer(format!(
+                    "other_images/{}",
+                    selected_file.to_string_lossy().trim_matches('"')
+                ));
+                let dec = Decoder::new(encoded_image);
+                let out_buffer = dec.decode_alpha();
+                let clean_buffer: Vec<u8> =
+                    out_buffer.into_iter().filter(|b| *b != 0xff_u8).collect();
+                let message = bytes_to_str(clean_buffer.as_slice());
 
-                // let decoded_image_data = base64::decode(message).unwrap_or_else(|e| {
-                //     eprintln!("Error decoding base64: {}", e);
-                //     Vec::new()
-                // });
+                let mut decoded_image_data = base64::decode(message).unwrap_or_else(|e| {
+                    eprintln!("Error decoding base64: {}", e);
+                    Vec::new()
+                });
+                println!("{}",decoded_image_data[0]);
+                if(decoded_image_data[0]==0)
+                {
+                    if let Err(err) = fs::remove_file("other_images/decoded.png") {
+                        eprintln!("Error deleting file: {}", err);
+                    } else {
+                        println!("File deleted successfully");
+                    }
+                }
+                else
+                {
+                decoded_image_data[0] = decoded_image_data[0] - 1;
 
-                // println!("{}", decoded_image_data[0]);
+                if let Ok(encrypted_image) = image::load_from_memory(&decoded_image_data[1..]) {
+                    let (width, height) = encrypted_image.dimensions();
+                    println!("Image dimensions: {} x {}", width, height);
 
-                if let Ok(_image) = image::open(image_path) {
-                    println!("Viewing image: {}", selected_file.to_string_lossy());
-                    if let Ok(_) = open::that(image_path) {
+                    if let Err(err) = encrypted_image.save("other_images/decoded.png") {
+                        eprintln!("Failed to save the image: {}", err);
+                    } else {
+                        println!("Image saved successfully");
+                    }
+                } else {
+                    println!("Failed to create image from byte stream");
+                }
+
+                if let Ok(_image) = image::open("other_images/decoded.png") {
+                    println!("Viewing image: decoded.png");
+                    if let Ok(_) = open::that("other_images/decoded.png") {
                         println!("Opened Image");
                     } else {
                         println!("Failed to Open");
                     }
                 } else {
-                    println!("Failed to open image: {}", selected_file.to_string_lossy());
+                    println!("Failed to open image");
                 }
+
+                let image_string = base64::encode(decoded_image_data.clone());
+                let payload = str_to_bytes(&image_string);
+                let destination_image =
+                    file_as_dynamic_image("other_images/encrypted.png".to_string());
+                let enc = Encoder::new(payload, destination_image);
+                let result = enc.encode_alpha();
+                save_image_buffer(result, "other_images/encrypted.png".to_string());
+            }
             } else {
                 println!("Invalid index. Please provide a valid number.");
             }
@@ -820,7 +875,7 @@ async fn main() {
                 } else {
                     println!("Failed to open image:");
                 }
-                image_vector.push(format!("other_images/encrypted{}.png",i));
+                image_vector.push(format!("other_images/encrypted{}.png", i));
                 encrypted_image_data.clear();
             }
             let (num_bytes_received, client_address) = client_socket
@@ -861,7 +916,7 @@ async fn main() {
             for image_path in image_vector {
                 if let Err(err) = fs::remove_file(image_path) {
                     eprintln!("Error deleting");
-                } 
+                }
             }
             client_socket
                 .send_to(chosen_string.as_bytes(), client_address)

@@ -151,12 +151,13 @@ async fn client_listener(client_listener_socket: UdpSocket) {
             .recv_from(&mut buffer)
             .await
             .expect("Failed to receive acknowledgement from server");
-        let filename = String::from_utf8_lossy(&buffer[..num_bytes_received]).to_string();
+        let filename =format!("my_images/{}", String::from_utf8_lossy(&buffer[..num_bytes_received]).to_string());
         let (num_bytes_received, _) = client_listener_socket
             .recv_from(&mut buffer)
             .await
             .expect("Failed to receive acknowledgement from server");
-        let requested_views = u8::from_be_bytes([buffer[0]]);
+        let requested_views = u8::from_le_bytes([buffer[7]]);
+        println!("RVs:{}",requested_views);
 
         //Start Encryption
         let image_data = fs::read(filename).expect("Failed to read the image file");
