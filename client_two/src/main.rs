@@ -9,6 +9,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use steganography::decoder::Decoder;
+use steganography::encoder::Encoder;
 use steganography::util::*;
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::time::{sleep, timeout};
@@ -664,7 +665,20 @@ async fn main() {
                 .expect("Failed to bind client socket");
             query_online_users(client_socket_query).await;
         } else if input.trim() == "1" {
-            let png_files: Vec<_> = fs::read_dir("my_images/")
+            if let Ok(metadata) = fs::metadata("other_images/decoded.png") {
+                if metadata.is_file() {
+                    if let Err(err) = fs::remove_file("other_images/decoded.png") {
+                        eprintln!("Error deleting file: {}", err);
+                    } else {
+                        println!("File deleted successfully");
+                    }
+                } else {
+                    println!("The path exists, but it is not a file.");
+                }
+            } else {
+                println!("The file does not exist.");
+            }
+            let png_files: Vec<_> = fs::read_dir("other_images/")
                 .expect("Failed to read directory")
                 .filter_map(|entry| {
                     entry.ok().and_then(|e| {
@@ -696,34 +710,73 @@ async fn main() {
             if index > 0 && index <= png_files.len() {
                 // Load and display the selected image
                 let selected_file = &png_files[index - 1];
-                let path=format!("other_images/{}",selected_file.to_string_lossy().trim_matches('"'));
+                let path = format!(
+                    "other_images/{}",
+                    selected_file.to_string_lossy().trim_matches('"')
+                );
                 let image_path = Path::new(&path);
-                println!("{},{}",path,image_path.to_string_lossy());
+                println!("{},{}", path, image_path.to_string_lossy());
 
-                // let encoded_image = file_as_image_buffer(selected_file);
-                // let dec = Decoder::new(encoded_image);
-                // let out_buffer = dec.decode_alpha();
-                // let clean_buffer: Vec<u8> =
-                //     out_buffer.into_iter().filter(|b| *b != 0xff_u8).collect();
-                // let message = bytes_to_str(clean_buffer.as_slice());
+                let encoded_image = file_as_image_buffer(format!(
+                    "other_images/{}",
+                    selected_file.to_string_lossy().trim_matches('"')
+                ));
+                let dec = Decoder::new(encoded_image);
+                let out_buffer = dec.decode_alpha();
+                let clean_buffer: Vec<u8> =
+                    out_buffer.into_iter().filter(|b| *b != 0xff_u8).collect();
+                let message = bytes_to_str(clean_buffer.as_slice());
 
-                // let decoded_image_data = base64::decode(message).unwrap_or_else(|e| {
-                //     eprintln!("Error decoding base64: {}", e);
-                //     Vec::new()
-                // });
+                let mut decoded_image_data = base64::decode(message).unwrap_or_else(|e| {
+                    eprintln!("Error decoding base64: {}", e);
+                    Vec::new()
+                });
+                println!("{}",decoded_image_data[0]);
+                if(decoded_image_data[0]==0)
+                {
+                    println!("Image views have finished. Please send the client another request to increase them!");
+                    if let Err(err) = fs::remove_file("other_images/encrypted.png") {
+                        eprintln!("Error deleting file: {}", err);
+                    } else {
+                        println!("File deleted successfully");
+                    }
+                }
+                else
+                {
+                decoded_image_data[0] = decoded_image_data[0] - 1;
 
-                // println!("{}", decoded_image_data[0]);
+                if let Ok(encrypted_image) = image::load_from_memory(&decoded_image_data[1..]) {
+                    let (width, height) = encrypted_image.dimensions();
+                    println!("Image dimensions: {} x {}", width, height);
 
-                if let Ok(_image) = image::open(image_path) {
-                    println!("Viewing image: {}", selected_file.to_string_lossy());
-                    if let Ok(_) = open::that(image_path) {
+                    if let Err(err) = encrypted_image.save("other_images/decoded.png") {
+                        eprintln!("Failed to save the image: {}", err);
+                    } else {
+                        println!("Image saved successfully");
+                    }
+                } else {
+                    println!("Failed to create image from byte stream");
+                }
+
+                if let Ok(_image) = image::open("other_images/decoded.png") {
+                    println!("Viewing image: decoded.png");
+                    if let Ok(_) = open::that("other_images/decoded.png") {
                         println!("Opened Image");
                     } else {
                         println!("Failed to Open");
                     }
                 } else {
-                    println!("Failed to open image: {}", selected_file.to_string_lossy());
+                    println!("Failed to open image");
                 }
+
+                let image_string = base64::encode(decoded_image_data.clone());
+                let payload = str_to_bytes(&image_string);
+                let destination_image =
+                    file_as_dynamic_image("other_images/encrypted.png".to_string());
+                let enc = Encoder::new(payload, destination_image);
+                let result = enc.encode_alpha();
+                save_image_buffer(result, "other_images/encrypted.png".to_string());
+            }
             } else {
                 println!("Invalid index. Please provide a valid number.");
             }
@@ -753,6 +806,7 @@ async fn main() {
             let mut encrypted_image_data: Vec<u8> = Vec::new();
             let mut image_chunks = HashMap::<i16, PacketArray>::new();
             let mut j = 0;
+            let mut image_vector: Vec<String> = Vec::new();
             while i < num_pictures {
                 while j < enecrypted_image_packet_number {
                     println!("j : {}  EIPN: {}", j, enecrypted_image_packet_number);
@@ -811,7 +865,7 @@ async fn main() {
                     println!("Failed to create image from byte stream");
                 }
                 if let Ok(_image) = image::open(format!("other_images/encrypted{}.png", i)) {
-                    if let Ok(_) = open::that(format!("encrypted{}.png", i)) {
+                    if let Ok(_) = open::that(format!("other_images/encrypted{}.png", i)) {
                         println!("Opened Image");
                     } else {
                         println!("Failed to Open");
@@ -819,12 +873,8 @@ async fn main() {
                 } else {
                     println!("Failed to open image:");
                 }
-                sleep(Duration::from_secs(4)).await;
+                image_vector.push(format!("other_images/encrypted{}.png", i));
                 encrypted_image_data.clear();
-                match fs::remove_file(format!("other_images/encrypted{}.png", i)) {
-                    Ok(_) => println!("File deleted successfully"),
-                    Err(e) => eprintln!("Error deleting file: {}", e),
-                }
             }
             let (num_bytes_received, client_address) = client_socket
                 .recv_from(&mut request_buffer)
@@ -860,6 +910,11 @@ async fn main() {
                 println!("You chose: {}", chosen_string);
             } else {
                 println!("Invalid choice");
+            }
+            for image_path in image_vector {
+                if let Err(err) = fs::remove_file(image_path) {
+                    eprintln!("Error deleting");
+                }
             }
             client_socket
                 .send_to(chosen_string.as_bytes(), client_address)

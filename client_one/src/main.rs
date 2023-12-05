@@ -88,20 +88,16 @@ async fn client_listener(client_listener_socket: UdpSocket) {
                 })
             })
             .collect();
-        let png_file_legnth: &[u8] = &png_files.len().to_be_bytes();
-        println!("Len:{:?}", png_file_legnth);
+        let png_file_legnth:&[u8]=&png_files.len().to_be_bytes();
+        println!("Len:{:?}",png_file_legnth);
         client_listener_socket
             .send_to(png_file_legnth, client_address)
             .await
             .expect("Failed to send data to server");
         let mut iterate = 0;
         while iterate < png_files.len() {
-            println!("{}", &png_files[iterate]);
-            let img = image::open(format!(
-                "my_images/{}",
-                &png_files[iterate].trim_matches('"')
-            ))
-            .expect("Failed to open image");
+            println!("{}",&png_files[iterate]);
+            let img = image::open(format!("my_images/{}",&png_files[iterate].trim_matches('"'))).expect("Failed to open image");
             let low_res = img.resize(512, 512, image::imageops::FilterType::Nearest);
 
             // let image_data = fs::read(&png_files[iterate]).expect("Failed to read the image file");
@@ -114,7 +110,7 @@ async fn client_listener(client_listener_socket: UdpSocket) {
                 .expect("Failed to write image to byte steam");
 
             let packet_number = (image_data.len() / MAX_CHUNCK) + 1;
-            println!("Packets:{}", packet_number);
+            println!("Packets:{}",packet_number);
             for (index, piece) in image_data.chunks(MAX_CHUNCK).enumerate() {
                 let is_last_piece = index == packet_number - 1;
                 let chunk = Chunk {
@@ -156,16 +152,17 @@ async fn client_listener(client_listener_socket: UdpSocket) {
             .recv_from(&mut buffer)
             .await
             .expect("Failed to receive acknowledgement from server");
-        let filename = String::from_utf8_lossy(&buffer[..num_bytes_received]).to_string();
+        let filename =format!("my_images/{}", String::from_utf8_lossy(&buffer[..num_bytes_received]).to_string());
         let (num_bytes_received, _) = client_listener_socket
             .recv_from(&mut buffer)
             .await
             .expect("Failed to receive acknowledgement from server");
-        let requested_views = u8::from_be_bytes([buffer[7]]);
+        let requested_views = u8::from_le_bytes([buffer[7]]);
+        println!("RVs:{}",requested_views);
 
         //Start Encryption
         let image_data = fs::read(filename).expect("Failed to read the image file");
-        let middleware_address = "127.0.0.9:12345"; // Replace with the actual middleware address and port
+        let middleware_address = "127.0.0.8:12345"; // Replace with the actual middleware address and port
                                                     //sleep(Duration::from_millis(5000)).await;
 
         let packet_number = (image_data.len() / MAX_CHUNCK) + 1;
@@ -355,7 +352,7 @@ async fn middleware_task(middleware_socket: UdpSocket) {
         } else {
             serverar += 1;
             println!("Server:{}", serverar);
-            let my_client_address = "127.0.0.8:3411";
+            let my_client_address = "127.0.0.8:8085";
             middleware_socket
                 .send_to(&buffer[0.._bytes_received], my_client_address)
                 .await
@@ -737,7 +734,8 @@ async fn main() {
                 println!("{}",decoded_image_data[0]);
                 if(decoded_image_data[0]==0)
                 {
-                    if let Err(err) = fs::remove_file("other_images/decoded.png") {
+                    println!("Image views have finished. Please send the client another request to increase them!");
+                    if let Err(err) = fs::remove_file("other_images/encrypted.png") {
                         eprintln!("Error deleting file: {}", err);
                     } else {
                         println!("File deleted successfully");
