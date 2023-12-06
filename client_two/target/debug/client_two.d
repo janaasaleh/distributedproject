@@ -1,1 +1,1 @@
-/home/doma/AUC/distributed/distributedproject/client_two/target/debug/client_two: /home/doma/AUC/distributed/distributedproject/client_two/src/big_array.rs /home/doma/AUC/distributed/distributedproject/client_two/src/main.rs
+/home/said/DS/distributedproject/client_two/target/debug/client_two: /home/said/DS/distributedproject/client_two/src/big_array.rs /home/said/DS/distributedproject/client_two/src/main.rs

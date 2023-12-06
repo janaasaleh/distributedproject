@@ -6,6 +6,7 @@ use std::fs;
 use std::net::SocketAddr;
 use steganography::encoder::*;
 use steganography::util::*;
+use sysinfo::{CpuExt, System, SystemExt};
 
 mod big_array;
 use big_array::BigArray;
@@ -252,7 +253,10 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
         let ip = client_address.ip(); //New
         let ip_string = ip.to_string(); // New
         let mut rng = rand::thread_rng();
-        let cpu_usage: i32 = rng.gen_range(0..10000);
+        let mut sys=System::new();
+        sys.refresh_all();
+        let cpu=sys.global_cpu_info();
+        let cpu_usage: f32 = cpu.cpu_usage();
         let real_cpu_usage: &[u8] = &cpu_usage.to_be_bytes();
         println!("My Load {}", my_load);
         println!("Current Server: {}", current_server);
@@ -306,13 +310,13 @@ async fn server_middleware(middleware_address: &str, server_addresses: Vec<&str>
                 .await
                 .expect("Couldn't recieve index");
         }
-        let mut index1 = i32::from_be_bytes([
+        let mut index1 = f32::from_be_bytes([
             server_to_server1_receive_buffer[0],
             server_to_server1_receive_buffer[1],
             server_to_server1_receive_buffer[2],
             server_to_server1_receive_buffer[3],
         ]);
-        let mut index2 = i32::from_be_bytes([
+        let mut index2 = f32::from_be_bytes([
             server_to_server2_receive_buffer[0],
             server_to_server2_receive_buffer[1],
             server_to_server2_receive_buffer[2],
